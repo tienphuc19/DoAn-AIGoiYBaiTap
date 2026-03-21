@@ -173,170 +173,34 @@ def get_student_profile(
     }
     # ==========================================
 # ==========================================
-# 5. GIAO DIỆN DEMO V2 (TÍCH HỢP GIẢNG VIÊN & CLICK BÀI TẬP)
 # ==========================================
-@app.get("/demo", tags=["Giao Diện Demo"], response_class=HTMLResponse)
-def get_demo_page():
-    html_content = """
-    <!DOCTYPE html>
-    <html lang="vi">
-    <head>
-        <meta charset="UTF-8">
-        <title>Demo Hệ Thống AI</title>
-        <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef2f3; padding: 20px; }
-            .container { max-width: 700px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-            /* Style cho Tabs */
-            .tabs { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 20px; }
-            .tab { padding: 10px 20px; cursor: pointer; font-weight: bold; color: #555; border-bottom: 3px solid transparent; }
-            .tab.active { color: #2196F3; border-bottom: 3px solid #2196F3; }
-            .tab-content { display: none; }
-            .tab-content.active { display: block; }
-            
-            /* Style nội dung */
-            .card { border-left: 5px solid #4CAF50; background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; cursor: pointer; transition: 0.3s; }
-            .card:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
-            .level { display: inline-block; padding: 4px 10px; background: #ff9800; color: white; border-radius: 15px; font-size: 12px; font-weight: bold; }
-            input, button { padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
-            button { background: #2196F3; color: white; cursor: pointer; border: none; font-weight: bold; }
-            button:hover { background: #0b7dda; }
-            
-            /* Cục thống kê Giảng viên */
-            .stat-box { background: #e3f2fd; padding: 15px; border-radius: 8px; margin-top: 15px; }
-            .tag-pill { display: inline-block; background: #4CAF50; color: white; padding: 5px 10px; border-radius: 15px; font-size: 12px; margin: 3px; }
-            .tag-pill.weak { background: #f44336; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2 style="text-align: center; color: #333;">🤖 HỆ THỐNG TRÍ TUỆ NHÂN TẠO</h2>
-            
-            <div class="tabs">
-                <div class="tab active" onclick="switchTab('student')">👨‍🎓 Góc nhìn Sinh Viên</div>
-                <div class="tab" onclick="switchTab('teacher')">👨‍🏫 Góc nhìn Giảng Viên</div>
-            </div>
+# 7. API ĐĂNG NHẬP (LẤY DỮ LIỆU TỪ SQL)
+# ==========================================
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
-            <div id="student" class="tab-content active">
-                <p>Nhập Mã SV để AI phân tích lộ trình học:</p>
-                <input type="number" id="studentId" placeholder="Mã SV (VD: 1, 2...)" value="1">
-                <button onclick="getRecommendations()">Xem Lộ Trình Của Tôi</button>
-                <p style="font-size: 12px; color: #888;">* Gợi ý: Click vào bài tập để giả lập làm bài và chấm điểm.</p>
-                <div id="result" style="margin-top: 20px;"></div>
-            </div>
+@app.post("/api/login", tags=["Hệ Thống"])
+def login_user(request: LoginRequest):
+    try:
+        conn = get_db_connection()
+        # Tìm tài khoản trong bảng TAIKHOAN (Bạn sẽ cần tạo bảng này trong SQL Server)
+        query = "SELECT VaiTro, MaNguoiDung, HoTen FROM TAIKHOAN WHERE TenDangNhap = ? AND MatKhau = ?"
+        df_user = pd.read_sql(query, conn, params=(request.username, request.password))
+        conn.close()
 
-            <div id="teacher" class="tab-content">
-                <p>Nhập Mã SV để xem báo cáo năng lực:</p>
-                <input type="number" id="teacherStudentId" placeholder="Mã SV (VD: 1, 2...)" value="1">
-                <button onclick="getTeacherStats()" style="background: #9c27b0;">Phân Tích Năng Lực</button>
-                <div id="teacherResult" style="margin-top: 20px;"></div>
-            </div>
-        </div>
-
-        <script>
-            // Đổi Tab
-            function switchTab(tabId) {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                event.target.classList.add('active');
-                document.getElementById(tabId).classList.add('active');
-            }
-
-            // GAPI Sinh Viên
-            async function getRecommendations() {
-                const stuId = document.getElementById('studentId').value;
-                const resultDiv = document.getElementById('result');
-                resultDiv.innerHTML = "<i>Đang kết nối AI...</i>";
-
-                try {
-                    const response = await fetch('/api/recommend', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-user-role': 'student' },
-                        body: JSON.stringify({ student_id: parseInt(stuId), top_k: 3 })
-                    });
-                    const data = await response.json();
-                    
-                    if(data.recommendations) {
-                        resultDiv.innerHTML = `<h3>🎯 Lộ trình đề xuất (Năng lực Level: ${data.current_level})</h3>`;
-                        data.recommendations.forEach(item => {
-                            resultDiv.innerHTML += `
-                                <div class="card" onclick="simulateExercise(${stuId}, ${item.ExerciseID}, '${item.Title}')">
-                                    <h4 style="margin: 0 0 10px 0;">ID: ${item.ExerciseID} - ${item.Title} 🖱️</h4>
-                                    <p style="margin: 0 0 10px 0; font-size: 14px; color: #555;">📚 Nguồn bài: ${item.Tags}</p>
-                                    <span class="level">Độ khó: Level ${item.Difficulty}</span>
-                                </div>
-                            `;
-                        });
-                    } else {
-                        resultDiv.innerHTML = "Không tìm thấy dữ liệu!";
-                    }
-                } catch (error) {
-                    resultDiv.innerHTML = "<span style='color:red'>Lỗi Server.</span>";
-                }
-            }
-
-            // Gợi ý làm bài (Simulate Submission)
-            async function simulateExercise(stuId, exId, title) {
-                let score = prompt(`Giả lập nộp bài cho ID ${exId} - ${title}\\nNhập điểm số đạt được (0 - 10):`);
-                if (score !== null && score !== "") {
-                    score = parseFloat(score);
-                    if(score >= 0 && score <= 10) {
-                        try {
-                            const response = await fetch('/api/submit-result', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'x-user-role': 'student' },
-                                body: JSON.stringify({ student_id: stuId, exercise_id: exId, score: score })
-                            });
-                            const data = await response.json();
-                            alert(data.message + "\\n\\nHãy bấm 'Xem Lộ Trình Của Tôi' lần nữa để xem AI thay đổi gợi ý nhé!");
-                        } catch (e) {
-                            alert("Lỗi khi lưu điểm!");
-                        }
-                    } else {
-                        alert("Điểm phải từ 0 đến 10!");
-                    }
-                }
-            }
-
-            // GAPI Giảng Viên
-            async function getTeacherStats() {
-                const stuId = document.getElementById('teacherStudentId').value;
-                const resultDiv = document.getElementById('teacherResult');
-                resultDiv.innerHTML = "<i>Đang trích xuất dữ liệu...</i>";
-
-                try {
-                    const response = await fetch(`/api/teacher/student/${stuId}`, {
-                        headers: { 'x-user-role': 'teacher' }
-                    });
-                    const data = await response.json();
-                    
-                    if(data.status === "error") {
-                        resultDiv.innerHTML = `<span style='color:red'>${data.message}</span>`;
-                        return;
-                    }
-
-                    let strongTagsHtml = data.strong_skills.map(t => `<span class="tag-pill">${t}</span>`).join('');
-                    let weakTagsHtml = data.weak_skills.map(t => `<span class="tag-pill weak">${t}</span>`).join('');
-
-                    resultDiv.innerHTML = `
-                        <div class="stat-box">
-                            <h3 style="margin-top:0;">📊 Báo cáo Sinh viên ID: ${data.student_id}</h3>
-                            <p><b>Tổng số bài đã làm:</b> ${data.total_attempts}</p>
-                            <p><b>Số bài điểm cao (>=5.0):</b> <span style="color:green; font-weight:bold;">${data.good_score_count}</span></p>
-                            <p><b>Số bài điểm thấp (<5.0):</b> <span style="color:red; font-weight:bold;">${data.low_score_count}</span></p>
-                            
-                            <hr style="border:0; border-top:1px solid #ccc; margin: 15px 0;">
-                            
-                            <h4>💪 Kỹ năng thế mạnh (Đã qua bài):</h4>
-                            <div>${strongTagsHtml || '<i>Chưa có dữ liệu</i>'}</div>
-                            
-                            <h4 style="margin-top: 15px;">⚠️ Kiến thức bị hổng (Điểm thấp):</h4>
-                            <div>${weakTagsHtml || '<i>Chưa có dữ liệu</i>'}</div>
-                        </div>
-                    `;
-                } catch (error) {
-                    resultDiv.innerHTML = "<span style='color:red'>Lỗi hệ thống.</span>";
-                }
-            }
+        if df_user.empty:
+            return {"status": "error", "message": "Sai tên đăng nhập hoặc mật khẩu!"}
+        
+        user_info = df_user.iloc[0]
+        return {
+            "status": "success",
+            "role": user_info['VaiTro'], # 'student' hoặc 'teacher'
+            "user_id": int(user_info['MaNguoiDung']),
+            "full_name": user_info['HoTen']
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi Database: {str(e)}")
         </script>
     </body>
     </html>
