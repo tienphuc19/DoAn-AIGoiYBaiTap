@@ -5,6 +5,8 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from fastapi.responses import FileResponse
+import os
 
 app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập - Bản Hoàn Thiện")
 
