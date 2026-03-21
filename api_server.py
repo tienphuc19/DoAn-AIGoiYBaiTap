@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware  # Thêm thư viện cấp phép CORS
 from pydantic import BaseModel
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -6,6 +7,17 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập - Bản Hoàn Thiện")
+
+# ==========================================
+# CẤP PHÉP BẢO MẬT CORS (Tránh lỗi chặn kết nối từ file HTML local)
+# ==========================================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Cho phép tất cả các nguồn (kể cả ổ C: của bạn)
+    allow_credentials=True,
+    allow_methods=["*"],  # Cho phép mọi phương thức GET, POST...
+    allow_headers=["*"],  # Cho phép mọi Header
+)
 
 # ==========================================
 # 1. CẤU HÌNH KẾT NỐI DATABASE CHO CLOUD SERVER
@@ -123,7 +135,6 @@ def submit_exercise_result(
 
     try:
         conn = get_db_connection()
-        # Đã sửa lại chuẩn lưu dữ liệu của SQLAlchemy
         insert_query = text("INSERT INTO AI_LichSuLamBai (MaSinhVien, MaBaiTap, DiemSo) VALUES (:sv, :bt, :diem)")
         conn.execute(insert_query, {"sv": request.student_id, "bt": request.exercise_id, "diem": request.score})
         conn.commit() 
@@ -176,7 +187,6 @@ class LoginRequest(BaseModel):
 def login_user(request: LoginRequest):
     try:
         conn = get_db_connection()
-        # Đã cập nhật chuẩn text() của SQLAlchemy để chống lỗi
         query = text("SELECT VaiTro, MaNguoiDung, HoTen FROM TAIKHOAN WHERE TenDangNhap = :usr AND MatKhau = :pwd")
         df_user = pd.read_sql(query, conn, params={"usr": request.username, "pwd": request.password})
         conn.close()
