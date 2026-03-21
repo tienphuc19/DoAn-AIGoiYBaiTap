@@ -205,3 +205,12 @@ def login_user(request: LoginRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi Database: {str(e)}")
+        # ==========================================
+# 6. GIAO DIỆN WEB CHÍNH (FRONTEND)
+# ==========================================
+@app.get("/", tags=["Hệ Thống"], response_class=FileResponse)
+def serve_frontend():
+    # Kiểm tra xem có file index.html trên server không, có thì nhả ra
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return {"message": "Chưa tìm thấy file giao diện index.html trên Server!"}
