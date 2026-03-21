@@ -58,9 +58,12 @@ def load_data_from_sql():
 # ==========================================
 # 2. LUỒNG SINH VIÊN: AI GỢI Ý BÀI TẬP 
 # ==========================================
+# ==========================================
+# 2. LUỒNG SINH VIÊN: AI GỢI Ý BÀI TẬP (NÂNG CẤP)
+# ==========================================
 class RecommendRequest(BaseModel):
     student_id: int
-    top_k: int = 3
+    top_k: int = 6  # Đã tăng lên bốc 6 bài tập thay vì 3
 
 @app.post("/api/recommend", tags=["Sinh Viên"])
 def get_recommendations(
@@ -76,12 +79,14 @@ def get_recommendations(
     passed_exercises = df_history[(df_history['StudentID'] == request.student_id) & (df_history['Score'] >= 5.0)]['ExerciseID'].tolist()
     
     if not passed_exercises:
-        easy_exercises = df_exercises[df_exercises['Difficulty'] == 1].head(request.top_k).to_dict('records')
-        return {"status": "new_student", "current_level": 1, "message": "Gợi ý cơ bản", "recommendations": easy_exercises}
+        # Nếu là sinh viên mới, bốc 6 bài Dễ và Trung bình
+        easy_exercises = df_exercises[df_exercises['Difficulty'] <= 2].head(request.top_k).to_dict('records')
+        return {"status": "new_student", "current_level": 1, "message": "Gợi ý lộ trình cơ bản", "recommendations": easy_exercises}
     else:
         current_level = df_exercises[df_exercises['ExerciseID'].isin(passed_exercises)]['Difficulty'].max()
         if pd.isna(current_level): current_level = 1
 
+    # Chạy thuật toán Content-Based Filtering
     tfidf = TfidfVectorizer()
     tfidf_matrix = tfidf.fit_transform(df_exercises['Tags'])
     cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
@@ -97,7 +102,8 @@ def get_recommendations(
         ex_id = row['ExerciseID']
         ex_diff = row['Difficulty']
         
-        if ex_id not in passed_exercises and ex_diff <= current_level + 1:
+        # Mở rộng vùng tìm kiếm: Bốc bài có độ khó lên đến Level + 2 (Ra được bài Khó)
+        if ex_id not in passed_exercises and ex_diff <= current_level + 2:
             recommendations.append(row.to_dict())
             
         if len(recommendations) >= request.top_k: 
