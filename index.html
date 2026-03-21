@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Gợi Ý Bài Tập - Full Kết Nối API</title>
+    <title>Hệ Thống Ngân Hàng Bài Tập</title>
     <style>
         /* CSS CƠ BẢN */
         :root { 
@@ -27,10 +27,10 @@
 
         /* BỐ CỤC CHUNG */
         .dashboard { display: flex; height: 100vh; }
-        .sidebar { width: 260px; background: var(--white); border-right: 1px solid var(--grey-light); padding: 25px 0; display: flex; flex-direction: column; }
+        .sidebar { width: 260px; background: var(--white); border-right: 1px solid var(--grey-light); padding: 25px 0; display: flex; flex-direction: column; overflow-y: auto;}
         .sidebar-header { padding: 0 25px 25px 25px; font-size: 19px; font-weight: bold; color: var(--primary); border-bottom: 2px solid var(--grey-light); margin-bottom: 15px; }
         .menu-list { flex: 1; list-style: none; padding: 0; margin: 0; }
-        .menu-item { padding: 15px 25px; cursor: pointer; transition: 0.2s; color: #555; font-weight: 500; }
+        .menu-item { padding: 12px 25px; cursor: pointer; transition: 0.2s; color: #555; font-weight: 500; font-size: 15px;}
         .menu-item:hover { background: #f0f4f8; color: var(--primary); }
         .menu-item.active { background: #e8eaf6; border-left: 4px solid var(--primary); color: var(--primary); font-weight: bold; }
         .logout-btn-container { margin-top: auto; padding: 15px 25px; border-top: 1px solid var(--grey-light); }
@@ -50,10 +50,15 @@
         .stat-card.level { border-top-color: var(--warning); }
         .stat-value { font-size: 26px; font-weight: bold; margin-top: 10px; }
         .ai-widget-container { background: var(--white); padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(33, 150, 243, 0.1); border: 2.5px dashed var(--ai-primary); min-height: 300px; }
-        .tag-status { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-top: 10px; }
+        
+        /* TAGS */
+        .tag-status { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-top: 10px; }
         .tag-danger { background: #ffebee; color: var(--danger); border: 1px solid #ffcdd2;}
         .tag-warning { background: #fff3e0; color: var(--warning); border: 1px solid #ffe0b2;}
         .tag-success { background: #e8f5e9; color: var(--success); border: 1px solid #c8e6c9;}
+
+        /* LỚP HỌC GIẢNG VIÊN */
+        .class-card { background: var(--white); padding: 20px; border-radius: 10px; box-shadow: var(--card-shadow); margin-bottom: 15px; border-left: 5px solid var(--primary);}
     </style>
 </head>
 <body>
@@ -80,9 +85,13 @@
         <div class="sidebar">
             <div class="sidebar-header">🏫 Ngân hàng Bài tập</div>
             <ul class="menu-list">
-                <li class="menu-item active">📚 Cấu trúc dữ liệu và Giải thuật</li>
+                <li class="menu-item active">📚 Cấu trúc dữ liệu & Giải thuật</li>
                 <li class="menu-item">📚 Kỹ thuật lập trình</li>
                 <li class="menu-item">📚 Lập trình hướng đối tượng</li>
+                <li class="menu-item">📚 Nhập môn lập trình</li>
+                <li class="menu-item">📚 Cơ sở dữ liệu</li>
+                <li class="menu-item">📚 Mạng máy tính</li>
+                <li class="menu-item">📚 Trí tuệ nhân tạo</li>
             </ul>
             <div class="logout-btn-container">
                 <button class="logout-btn" onclick="logout()">🚪 Đăng Xuất</button>
@@ -112,6 +121,49 @@
 
             <div class="ai-widget-container" id="ai-recommendation-box">
                 </div>
+        </div>
+    </div>
+
+    <div id="teacher-dashboard" class="dashboard hidden">
+        <div class="sidebar">
+            <div class="sidebar-header">👨‍🏫 Quản lý Giảng dạy</div>
+            <ul class="menu-list">
+                <li class="menu-item active">🏢 Tổng quan Lớp học</li>
+                <li class="menu-item">📈 Thống kê Năng lực</li>
+                <li class="menu-item">📦 Ngân hàng đề thi</li>
+                <li class="menu-item">⚙️ Cài đặt lớp</li>
+            </ul>
+            <div class="logout-btn-container">
+                <button class="logout-btn" onclick="logout()">🚪 Đăng Xuất</button>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="user-top-bar">
+                <div class="user-profile-info">
+                    <div class="avatar-circle" style="background: #e14eca;">GV</div>
+                    <div class="user-name-id">
+                        <h2 id="gv-fullname">Đang tải...</h2>
+                        <p>Mã GV: Giảng Viên Cơ Hữu | Khoa: Công nghệ thông tin</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: #fff3f3; border-left: 6px solid var(--danger); padding: 15px; border-radius: 8px; margin-bottom: 25px; font-weight: bold; color: #d32f2f;">
+                ⚠️ Có 5 sinh viên có điểm trung bình dưới 5.0 cần hỗ trợ!
+            </div>
+
+            <h3 style="color: #555; border-bottom: 2px solid #eee; padding-bottom: 10px;">Các lớp đang phụ trách (Học kỳ hiện tại)</h3>
+            
+            <div class="class-card">
+                <h3 style="margin: 0 0 10px 0; color: var(--primary);">Cấu trúc dữ liệu và Giải thuật (CTDLGT_01)</h3>
+                <p style="margin: 5px 0; color: #555;">Sĩ số: 45 | Phòng học: A1.204</p>
+                <span class="tag-status tag-danger">3 SV Yếu</span> <span class="tag-status tag-success">42 SV Khá Giỏi</span>
+            </div>
+            <div class="class-card">
+                <h3 style="margin: 0 0 10px 0; color: var(--primary);">Kỹ thuật lập trình (KTLT_03)</h3>
+                <p style="margin: 5px 0; color: #555;">Sĩ số: 50 | Phòng học: B2.105</p>
+                <span class="tag-status tag-danger">2 SV Yếu</span> <span class="tag-status tag-success">48 SV Khá Giỏi</span>
+            </div>
         </div>
     </div>
 
@@ -150,6 +202,9 @@
                     document.getElementById('sv-id-info').innerText = `Mã SV: ${data.user_id} | Lớp: 22CT111`;
                     document.getElementById('student-dashboard').classList.remove('hidden');
                     loadAIRecommendations(); 
+                } else if(data.role === 'teacher') {
+                    document.getElementById('gv-fullname').innerText = "Giảng viên: " + data.full_name;
+                    document.getElementById('teacher-dashboard').classList.remove('hidden');
                 }
             } catch (error) {
                 alert("Lỗi kết nối Server!");
@@ -159,28 +214,29 @@
 
         async function loadAIRecommendations() {
             const aiContainer = document.getElementById('ai-recommendation-box');
-            aiContainer.innerHTML = `<h3 style="color: #2196F3;">🤖 AI Đang Phân Tích Lộ Trình...</h3>`;
+            aiContainer.innerHTML = `<h3 style="color: #2196F3;">🤖 AI Đang Phân Tích Lộ Trình (6 Bài)...</h3>`;
 
             try {
                 const response = await fetch(`${SERVER_URL}/api/recommend`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-user-role': 'student' },
-                    body: JSON.stringify({ student_id: currentUserId, top_k: 3 })
+                    body: JSON.stringify({ student_id: currentUserId, top_k: 6 }) // Yêu cầu trả về 6 bài
                 });
                 const data = await response.json();
 
                 if(data.recommendations && data.recommendations.length > 0) {
                     document.getElementById('ai-level-display').innerText = `Level ${data.current_level} (Đã phân tích)`;
-                    let htmlList = `<h3>🤖 Lộ Trình Gợi Ý Tự Động (Năng lực Level: ${data.current_level})</h3>`;
+                    let htmlList = `<h3 style="color: #333; margin-bottom: 20px;">🤖 Lộ Trình Gợi Ý Tự Động (Level: ${data.current_level})</h3>`;
                     
                     data.recommendations.forEach(item => {
+                        let levelName = item.Difficulty == 1 ? "Mức: Dễ" : (item.Difficulty == 2 ? "Mức: Trung Bình" : "Mức: Khó");
                         let levelTag = item.Difficulty == 1 ? "tag-success" : (item.Difficulty == 2 ? "tag-warning" : "tag-danger");
                         htmlList += `
                             <div style="padding: 18px; background: #f9f9f9; border-radius: 8px; border-left: 5px solid #2196F3; margin-top: 15px; cursor:pointer;">
                                 <b style="font-size: 16px;">ID: ${item.ExerciseID} - ${item.Title}</b><br>
                                 <div style="margin-top: 8px;">
-                                    <span style="color: #666;">Chủ đề: ${item.Tags}</span> 
-                                    <span class="tag-status ${levelTag}" style="margin-left: 10px;">Level ${item.Difficulty}</span>
+                                    <span style="color: #666; font-size: 14px;">Chủ đề: ${item.Tags}</span> 
+                                    <span class="tag-status ${levelTag}" style="margin-left: 10px;">${levelName}</span>
                                 </div>
                             </div>
                         `;
