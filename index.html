@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Ngân Hàng Bài Tập - Bản Nâng Cấp V2</title>
+    <style>
+        /* ================= CSS CƠ BẢN & MÀU SẮC (Cải thiện độ bóng và màu sắc) ================= */
+        :root { 
+            --primary: #3f51b5; --primary-hover: #303f9f;
+            --bg: #f4f7f6; --text: #333; --muted: #666; 
+            --danger: #f44336; --success: #4CAF50; --warning: #ff9800; --ai-primary: #2196F3;
+            --white: #fff; --grey-light: #eee; --card-shadow: 0 4px 8px rgba(0,0,0,0.08); 
+        }
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg); color: var(--text); }
+        .hidden { display: none !important; }
+        
+        /* ================= MÀN HÌNH ĐĂNG NHẬP (Enhanced UX/Phân quyền thực tế) ================= */
+        #login-screen { height: 100vh; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #3f51b5 0%, #1a237e 100%); }
+        .login-box { background: var(--white); padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 380px; text-align: center; }
+        .login-box h2 { color: var(--primary); margin-bottom: 30px; }
+        .login-form-group { text-align: left; margin-bottom: 20px; }
+        .login-form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+        .login-form-group input, .login-form-group select { width: 100%; padding: 12px 15px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; }
+        .login-form-group select { cursor: pointer; }
+        .main-login-btn { width: 100%; padding: 15px; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; background-color: var(--primary); color: var(--white); transition: 0.3s; }
+        .main-login-btn:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
+        .login-extra { margin-top: 20px; font-size: 14px; color: var(--muted); }
+        .login-extra a { color: var(--primary); text-decoration: none; font-weight: bold; }
+
+        /* ================= BỐ CỤC CHUNG CHO DASHBOARD ================= */
+        .dashboard { display: flex; height: 100vh; }
+        
+        /* THANH ĐIỀU HƯỚNG BÊN TRÁI (Professional Style) */
+        .sidebar { width: 260px; background: var(--white); border-right: 1px solid var(--grey-light); padding: 25px 0; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 0 25px 25px 25px; font-size: 19px; font-weight: bold; color: var(--primary); border-bottom: 2px solid var(--grey-light); margin-bottom: 15px; display: flex; align-items: center; gap: 8px;}
+        .menu-list { flex: 1; list-style: none; padding: 0; margin: 0; }
+        .menu-item { padding: 15px 25px; cursor: pointer; transition: 0.2s; border-left: 5px solid transparent; color: #555; font-weight: 500; display: flex; align-items: center; gap: 10px; }
+        .menu-item:hover { background: #f0f4f8; color: var(--primary); }
+        .menu-item.active { background: #e8eaf6; border-left-color: var(--primary); color: var(--primary); font-weight: bold; }
+        .menu-icon { font-size: 18px; }
+        .logout-btn-container { margin-top: auto; padding: 15px 25px; border-top: 1px solid var(--grey-light); }
+        .logout-btn { color: var(--danger); cursor: pointer; font-weight: bold; width: 100%; padding: 10px; background: transparent; border: 2px solid var(--danger); border-radius: 6px; transition: 0.3s;}
+        .logout-btn:hover { background: #ffebee; transform: translateY(-1px); }
+
+        /* NỘI DUNG CHÍNH (BÊN PHẢI) */
+        .main-content { flex: 1; padding: 30px; overflow-y: auto; }
+        
+        /* THANH THÔNG TIN NGƯỜI DÙNG Ở TRÊN CÙNG */
+        .user-top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--white); padding: 15px 25px; border-radius: 10px; box-shadow: var(--card-shadow); margin-bottom: 30px; }
+        .user-profile-info { display: flex; align-items: center; gap: 15px; }
+        .avatar-circle { width: 50px; height: 50px; border-radius: 50%; background: #ccc; display: flex; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; color: white; }
+        .user-name-id { text-align: left; }
+        .user-name-id h2 { margin: 0; color: var(--text); font-size: 18px; }
+        .user-name-id p { margin: 3px 0 0 0; color: var(--muted); font-size: 14px; }
+        .welcome-msg { font-size: 20px; font-weight: bold; color: var(--primary); }
+        
+        /* THẺ THỐNG KIÊ / THÔNG TIN CHUNG */
+        .grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: var(--white); padding: 25px; border-radius: 10px; box-shadow: var(--card-shadow); border-top: 4px solid var(--primary); display: flex; align-items: center; gap: 20px;}
+        .stat-card.level { border-top-color: var(--warning); }
+        .stat-icon-bg { font-size: 35px; color: var(--muted); opacity: 0.6; }
+        .stat-card.level .stat-icon-bg { color: var(--warning); opacity: 1; }
+        .stat-value { font-size: 26px; font-weight: bold; color: var(--text); margin-top: 10px; }
+        .stat-label { color: var(--muted); font-size: 14px; font-weight: 500; }
+        
+        /* BIỂU ĐỒ HOẶC THANH TIẾN TRÌNH TƯỢNG TRƯNG */
+        .progress-bar-placeholder { height: 12px; background: #eee; border-radius: 6px; overflow: hidden; margin-top: 15px; }
+        .progress-fill { height: 100%; background-color: var(--success); width: 85%; }
+        .level .progress-fill { background-color: var(--warning); width: 66.6%; } /* Giả lập mốc Level 2 của 3 levels */
+
+        /* THẺ CẢNH BÁO GIẢNG VIÊN (Modern Alert Style) */
+        .alert-box { background: #fff3f3; border-left: 6px solid var(--danger); padding: 20px; border-radius: 8px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 10px rgba(244, 67, 54, 0.1); }
+        .alert-text { color: #d32f2f; font-weight: bold; font-size: 17px; }
+        
+        /* KHU VỰC CHỨA CÁC THẺ MÔN HỌC HOẶC LỚP HỌC */
+        .section-title-bar { display: flex; justify-content: space-between; align-items: center; margin: 35px 0 15px 0; border-bottom: 1px solid var(--grey-light); padding-bottom: 10px; }
+        .section-title { color: #555; margin: 0; font-size: 18px; font-weight: bold; }
+        
+        .class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        .class-card { background: var(--white); padding: 25px; border-radius: 12px; box-shadow: var(--card-shadow); border: 2px solid transparent; transition: 0.3s; }
+        .class-card:hover { transform: translateY(-5px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); border-color: #d1d9ff; }
+        .class-card h3 { margin: 0 0 12px 0; color: var(--primary); font-size: 17px; }
+        .class-info-item { color: var(--muted); font-size: 14px; margin: 6px 0; display: flex; align-items: center; gap: 7px; }
+        
+        /* KHUNG CHỨA AI GỢI Ý & NÚT BẤM */
+        .ai-widget-container { background: var(--white); padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(33, 150, 243, 0.1); border: 2.5px dashed var(--ai-primary); min-height: 300px; }
+        .widget-header-row { display: flex; justify-content: space-between; align-items: center; margin-top: 0; margin-bottom: 20px;}
+        
+        /* KIỂU DÁNG NÚT BẤM CẢI THIỆN */
+        .action-btn { padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.2s; border: none; display: flex; align-items: center; gap: 7px; }
+        .btn-view-results { background-color: var(--grey-light); color: var(--text); border: 1px solid #ccc; }
+        .btn-view-results:hover { background-color: #e0e0e0; }
+        .btn-interact-danger { background-color: transparent; border: 2px solid var(--danger); color: var(--danger); }
+        .btn-interact-danger:hover { background-color: #ffebee; transform: translateY(-1px); }
+        .btn-manage-class { background-color: var(--primary); color: var(--white); width: 100%; justify-content: center; margin-top: 20px; }
+        .btn-manage-class:hover { background-color: var(--primary-hover); }
+        
+        /* TAG CẢNH BÁO ĐIỂM THẤP */
+        .tag-status { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-top: 10px; }
+        .tag-danger { background-color: #ffebee; color: var(--danger); border: 1px solid #ffcdd2;}
+        .tag-warning { background-color: #fff3e0; color: var(--warning); border: 1px solid #ffe0b2;}
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="login-box">
+            <h2>Hệ Thống Ngân Hàng Bài Tập</h2>
+            <p style="color: var(--muted); margin-bottom: 30px; font-size: 15px;">Vui lòng nhập thông tin để truy cập hệ thống</p>
+            
+            <div class="login-form-group">
+                <label>Tên Đăng Nhập</label>
+                <input type="text" placeholder="Nhập tên tài khoản (tượng trưng)" value="tienphuc19_demo">
+            </div>
+            <div class="login-form-group">
+                <label>Mật Khẩu</label>
+                <input type="password" placeholder="Nhập mật khẩu (tượng trưng)" value="12345678">
+            </div>
+            
+            <div class="login-form-group">
+                <label>Vai Trò Người Dùng</label>
+                <select id="login-role-select">
+                    <option value="student" selected>👨‍🎓 Sinh Viên</option>
+                    <option value="teacher">👨‍🏫 Giảng Viên</option>
+                </select>
+            </div>
+            
+            <button class="main-login-btn" onclick="handleLoginFlow()">Xác Nhận Đăng Nhập</button>
+            
+            <div class="login-extra">
+                <a href="#">Đăng ký tài khoản</a> | <a href="#">Quên mật khẩu?</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="student-dashboard" class="dashboard hidden">
+        <div class="sidebar">
+            <div class="sidebar-header">🏫 Ngân hàng Bài tập</div>
+            <ul class="menu-list">
+                <li class="menu-item active" onclick="simulateNav('CTDLGT')">📚 Cấu trúc dữ liệu và Giải thuật</li>
+                <li class="menu-item" onclick="simulateNav('KTLT')">📚 Kỹ thuật lập trình</li>
+                <li class="menu-item" onclick="simulateNav('OOP')">📚 Lập trình hướng đối tượng</li>
+                <li class="menu-item" onclick="simulateNav('NM LT')">📚 Nhập môn lập trình</li>
+                <li class="menu-item" onclick="simulateNav('Thống kê')">📊 Kết quả & Thống kê</li>
+            </ul>
+            <div class="logout-btn-container">
+                <button class="logout-btn" onclick="logout()">🚪 Đăng Xuất</button>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="user-top-bar">
+                <div class="user-profile-info">
+                    <div class="avatar-circle">P</div>
+                    <div class="user-name-id">
+                        <h2>Tạ Tiến Phúc (Thông tin tượng trưng)</h2>
+                        <p>Mã SV: 202401001 | Ngành: CNTT - Chất lượng cao</p>
+                    </div>
+                </div>
+                <div class="welcome-msg">Cố gắng học nhé! 💪</div>
+            </div>
+            
+            <div class="grid-stats">
+                <div class="stat-card">
+                    <div class="stat-icon-bg">📈</div>
+                    <div>
+                        <div class="stat-label">Báo cáo Học lực học kỳ này</div>
+                        <div class="stat-value" style="color: var(--success);">Khá Giỏi (8.2 TB)</div>
+                        <div class="progress-bar-placeholder"><div class="progress-fill"></div></div>
+                    </div>
+                </div>
+                <div class="stat-card level">
+                    <div class="stat-icon-bg">🎯</div>
+                    <div>
+                        <div class="stat-label">Năng lực AI Phân Tích Thực Tế</div>
+                        <div class="stat-value">Level 2 (Trung bình TB)</div>
+                        <div class="progress-bar-placeholder"><div class="progress-fill"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ai-widget-container">
+                <div class="widget-header-row">
+                    <h3 style="color: var(--ai-primary); margin: 0;">🤖 Lộ Trình Gợi Ý Tự Động Từ AI</h3>
+                    <button class="action-btn btn-view-results" onclick="alert('Tính năng này sẽ gọi API lấy thông tin lộ trình đầy đủ!')">🔎 Xem đầy đủ lộ trình</button>
+                </div>
+                <p style="color: var(--muted); font-size: 15px;">Chúng ta sẽ dùng thẻ iframe hoặc Javascript để nhúng giao diện bài tập AI đã xây dựng từ server Render vào khu vực này.</p>
+                
+                <p style="font-size: 13px; color: #999;">(Giả lập hiển thị giao diện AI đã xây dựng)</p>
+                <div style="padding: 15px; background: #f9f9f9; border-radius: 8px; border-left: 5px solid var(--ai-primary); font-size: 14px; margin-top: 15px;">
+                    <b>ID: 376 - Kiểm tra đồ thị liên thông (🖱️Click test nhúng)</b> | Nguồn bài: CTDLGT <span class="tag-status tag-warning" style="margin-left: 10px;">Level 2</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="teacher-dashboard" class="dashboard hidden">
+        <div class="sidebar">
+            <div class="sidebar-header">Quản lý Giảng dạy</div>
+            <ul class="menu-list">
+                <li class="menu-item active" onclick="simulateNav('Tổng quan Lớp')">🏢 Tổng quan Lớp học</li>
+                <li class="menu-item" onclick="simulateNav('Thống kê Năng lực')">📈 Thống kê Năng lực</li>
+                <li class="menu-item" onclick="simulateNav('Ngân hàng đề thi')">📦 Ngân hàng đề thi</li>
+                <li class="menu-item" onclick="simulateNav('Cài đặt lớp')">⚙️ Cài đặt lớp</li>
+            </ul>
+            <div class="logout-btn-container">
+                <button class="logout-btn" onclick="logout()">🚪 Đăng Xuất</button>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="user-top-bar">
+                <div class="user-profile-info">
+                    <div class="avatar-circle" style="background: #e14eca;">B</div>
+                    <div class="user-name-id">
+                        <h2>ThS. Trần Thị B (Thông tin tượng trưng)</h2>
+                        <p>Mã GV: GV202419 | Khoa: Công nghệ thông tin</p>
+                    </div>
+                </div>
+                <div class="welcome-msg">Chúc thầy/cô một ngày tốt lành!</div>
+            </div>
+
+            <div class="alert-box">
+                <div class="alert-text">⚠️ Cảnh báo Năng lực Sinh viên: Học kỳ 1 - 2026 đang có 8 sinh viên có điểm số dưới 5.0 cần hỗ trợ!</div>
+                <button class="action-btn btn-interact-danger" onclick="alert('Tính năng này sẽ gọi API lấy thông tin danh sách chi tiết sinh viên bị điểm thấp!')">🔎 Xem danh sách ngay</button>
+            </div>
+
+            <div class="section-title-bar">
+                <h3 class="section-title">Các lớp đang giảng dạy học kỳ này (Giả lập thông tin)</h3>
+            </div>
+            
+            <div class="class-grid">
+                <div class="class-card">
+                    <h3>📚 Cấu trúc dữ liệu và Giải thuật</h3>
+                    <p class="class-info-item">🆔 Mã lớp: CTDLGT_CL01</p>
+                    <p class="class-info-item">👨‍👩‍👧‍👦 Sĩ số: 45 sinh viên</p>
+                    <p class="class-info-item">🏫 Phòng: C.201</p>
+                    <hr style="border: 0; border-top: 1px solid var(--grey-light); margin: 15px 0;">
+                    <span class="tag-status tag-danger">🔴 5 SV điểm thấp (<5.0)</span>
+                    <button class="action-btn btn-manage-class" onclick="alert('Sẽ gọi API lấy thông tin danh sách đầy đủ của lớp!')">Quản lý lớp</button>
+                </div>
+                <div class="class-card">
+                    <h3>📚 Kỹ thuật lập trình</h3>
+                    <p class="class-info-item">🆔 Mã lớp: KTLT_Demo03</p>
+                    <p class="class-info-item">👨‍👩‍👧‍👦 Sĩ số: 50 sinh viên</p>
+                    <p class="class-info-item">🏫 Phòng: D.105</p>
+                    <hr style="border: 0; border-top: 1px solid var(--grey-light); margin: 15px 0;">
+                    <span class="tag-status tag-warning">🟠 3 SV điểm thấp (<5.0)</span>
+                    <button class="action-btn btn-manage-class" onclick="alert('Sẽ gọi API lấy thông tin danh sách đầy đủ của lớp!')">Quản lý lớp</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // XỬ LÝ ĐĂNG NHẬP PHÂN QUYỀN THỰC TẾ
+        function handleLoginFlow() {
+            // Lấy giá trị từ ô select
+            const roleSelect = document.getElementById('login-role-select');
+            const selectedRole = roleSelect.value;
+            
+            console.log("Xử lý đăng nhập với vai trò:", selectedRole);
+
+            // Ẩn màn hình đăng nhập
+            document.getElementById('login-screen').classList.add('hidden');
+            
+            // Hiện Dashboard tương ứng dựa trên phân quyền thực tế
+            if(selectedRole === 'student') {
+                document.getElementById('student-dashboard').classList.remove('hidden');
+            } else if(selectedRole === 'teacher') {
+                document.getElementById('teacher-dashboard').classList.remove('hidden');
+            }
+        }
+
+        // XỬ LÝ ĐĂNG XUẤT
+        function logout() {
+            // Ẩn các Dashboard
+            document.getElementById('student-dashboard').classList.add('hidden');
+            document.getElementById('teacher-dashboard').classList.add('hidden');
+            
+            // Hiện lại màn hình đăng nhập
+            document.getElementById('login-screen').classList.remove('hidden');
+        }
+
+        // GIẢ LẬP KHI BẤM NÚT DI CHUYỂN HOẶC TƯƠNG TÁC
+        function simulateNav(featureName) {
+            console.log("Navigating to feature:", featureName);
+            // Hiện thông báo popup nhỏ để xác nhận nút đã được nhấn
+            alert(`Tính năng này chưa được liên kết đầy đủ! Nó sẽ dùng API lấy thông tin và mở ra giao diện tương ứng.`);
+        }
+    </script>
+</body>
+</html>
