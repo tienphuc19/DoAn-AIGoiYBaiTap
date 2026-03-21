@@ -1,23 +1,19 @@
 from fastapi import FastAPI, HTTPException, Header
-from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import pandas as pd
-from sqlalchemy import create_engine # Thêm thư viện này
+from sqlalchemy import create_engine, text
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập - Cloud Server Edition")
+app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập - Bản Hoàn Thiện")
 
 # ==========================================
-# 1. CẤU HÌNH KẾT NỐI DATABASE CHO CLOUD SERVER (LINUX)
+# 1. CẤU HÌNH KẾT NỐI DATABASE CHO CLOUD SERVER
 # ==========================================
 def get_db_connection():
-    # Sử dụng pymssql thay cho pyodbc để chạy mượt trên Linux server
     db_url = "mssql+pymssql://userPersonalizedSystem:123456789@118.69.126.49/Data_PersonalizedSystem"
     engine = create_engine(db_url)
     return engine.connect()
-
-# (Các phần load_data_from_sql và API bên dưới BẠN GIỮ NGUYÊN HOÀN TOÀN NHÉ)
 
 def load_data_from_sql():
     try:
@@ -34,7 +30,7 @@ def load_data_from_sql():
         """
         df_exercises = pd.read_sql(query_exercises, conn)
         
-        # Đọc lịch sử làm bài (ĐÃ ĐỔI THÀNH ĐIỂM SỐ)
+        # Đọc lịch sử làm bài
         query_history = """
             SELECT 
                 MaSinhVien AS StudentID, 
@@ -112,7 +108,7 @@ def get_recommendations(
 class SubmitResultRequest(BaseModel):
     student_id: int
     exercise_id: int
-    score: float  # Nhận điểm số thập phân (VD: 8.5)
+    score: float
 
 @app.post("/api/submit-result", tags=["Sinh Viên"])
 def submit_exercise_result(
@@ -122,16 +118,14 @@ def submit_exercise_result(
     if x_user_role != "student":
         raise HTTPException(status_code=403, detail="Cấm truy cập!")
     
-    # Chặn không cho nhập điểm vớ vẩn
     if request.score < 0 or request.score > 10:
         raise HTTPException(status_code=400, detail="Điểm số phải nằm trong khoảng từ 0 đến 10")
 
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        # Lưu điểm số thẳng vào Database
-        insert_query = "INSERT INTO AI_LichSuLamBai (MaSinhVien, MaBaiTap, DiemSo) VALUES (?, ?, ?)"
-        cursor.execute(insert_query, (request.student_id, request.exercise_id, request.score))
+        # Đã sửa lại chuẩn lưu dữ liệu của SQLAlchemy
+        insert_query = text("INSERT INTO AI_LichSuLamBai (MaSinhVien, MaBaiTap, DiemSo) VALUES (:sv, :bt, :diem)")
+        conn.execute(insert_query, {"sv": request.student_id, "bt": request.exercise_id, "diem": request.score})
         conn.commit() 
         conn.close()
         return {"status": "success", "message": f"Đã lưu thành công {request.score} điểm cho bài tập {request.exercise_id}!"}
@@ -155,7 +149,6 @@ def get_student_profile(
     if student_data.empty:
         return {"status": "error", "message": "Sinh viên chưa làm bài."}
 
-    # Phân loại: >= 5.0 là Giỏi/Khá, < 5.0 là Yếu
     passed_ex = student_data[student_data['Score'] >= 5.0]['ExerciseID'].tolist()
     failed_ex = student_data[student_data['Score'] < 5.0]['ExerciseID'].tolist()
 
@@ -171,10 +164,9 @@ def get_student_profile(
         "strong_skills": strong_tags,
         "weak_skills": weak_tags
     }
-    # ==========================================
+
 # ==========================================
-# ==========================================
-# 7. API ĐĂNG NHẬP (LẤY DỮ LIỆU TỪ SQL)
+# 5. API ĐĂNG NHẬP (LẤY DỮ LIỆU TỪ SQL)
 # ==========================================
 class LoginRequest(BaseModel):
     username: str
@@ -184,9 +176,9 @@ class LoginRequest(BaseModel):
 def login_user(request: LoginRequest):
     try:
         conn = get_db_connection()
-        # Tìm tài khoản trong bảng TAIKHOAN (Bạn sẽ cần tạo bảng này trong SQL Server)
-        query = "SELECT VaiTro, MaNguoiDung, HoTen FROM TAIKHOAN WHERE TenDangNhap = ? AND MatKhau = ?"
-        df_user = pd.read_sql(query, conn, params=(request.username, request.password))
+        # Đã cập nhật chuẩn text() của SQLAlchemy để chống lỗi
+        query = text("SELECT VaiTro, MaNguoiDung, HoTen FROM TAIKHOAN WHERE TenDangNhap = :usr AND MatKhau = :pwd")
+        df_user = pd.read_sql(query, conn, params={"usr": request.username, "pwd": request.password})
         conn.close()
 
         if df_user.empty:
@@ -195,14 +187,9 @@ def login_user(request: LoginRequest):
         user_info = df_user.iloc[0]
         return {
             "status": "success",
-            "role": user_info['VaiTro'], # 'student' hoặc 'teacher'
+            "role": user_info['VaiTro'],
             "user_id": int(user_info['MaNguoiDung']),
             "full_name": user_info['HoTen']
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi Database: {str(e)}")
-        </script>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content, status_code=200)
