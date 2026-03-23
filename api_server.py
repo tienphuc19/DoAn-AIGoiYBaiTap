@@ -120,9 +120,6 @@ def mock_grade_and_submit_result(request: MockGradeRequest, x_user_role: str = H
         return {"status": "success", "score": final_grade, "passed": final_grade >= 5.0, "message": f"🤖 Đã chấm tự động dựa trên tiêu chí SQL."}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
-# ==========================================
-# CÁI KHUÔN NÀY ĐÃ ĐƯỢC THÊM LẠI ĐẦY ĐỦ RỒI ĐÂY
-# ==========================================
 class RecommendRequest(BaseModel):
     student_id: int
     top_k: int = 6
@@ -214,28 +211,54 @@ def login_user(request: LoginRequest):
         return {"status": "success", "role": df_user.iloc[0]['VaiTro'], "user_id": int(df_user.iloc[0]['MaNguoiDung']), "full_name": df_user.iloc[0]['HoTen']}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+# ==========================================
+# API ĐÃ NÂNG CẤP: TRẢ VỀ ĐIỂM CHI TIẾT TỪNG SINH VIÊN
+# ==========================================
 @app.get("/api/teacher/overview", tags=["Giảng Viên"])
 def get_teacher_overview(x_user_role: str = Header(None, description="Bắt buộc nhập 'teacher'")):
     if x_user_role != "teacher": raise HTTPException(status_code=403, detail="Cấm truy cập!")
     try:
         conn = get_db_connection()
-        df_sv = pd.read_sql("SELECT MaNguoiDung, HoTen FROM TAIKHOAN WHERE VaiTro = 'student'", conn)
+        # Lấy thông tin sinh viên kèm Tên đăng nhập (Mã SV)
+        df_sv = pd.read_sql("SELECT MaNguoiDung, TenDangNhap, HoTen FROM TAIKHOAN WHERE VaiTro = 'student'", conn)
         df_diem = pd.read_sql("SELECT MaSinhVien, DiemSo FROM AI_LichSuLamBai", conn)
         conn.close()
 
         if df_sv.empty: return {"status": "success", "weak_students_count": 0, "classes": []}
 
-        df_sv['Lop'] = df_sv['HoTen'].str.extract(r'\((.*?)\)')[0]
-        df_sv['Lop'] = df_sv['Lop'].fillna('Không xác định')
+        # Bóc tách tên lớp
+        df_sv['Lop'] = df_sv['HoTen'].str.extract(r'\((.*?)\)')[0].fillna('Không xác định')
 
-        class_counts = df_sv['Lop'].value_counts().reset_index()
-        class_counts.columns = ['class_name', 'student_count']
-        classes_data = class_counts.to_dict('records')
-
-        weak_count = 0
+        # Ghép điểm trung bình vào từng sinh viên
         if not df_diem.empty:
             avg_scores = df_diem.groupby('MaSinhVien')['DiemSo'].mean().reset_index()
-            weak_count = int((avg_scores['DiemSo'] < 5.0).sum())
+            avg_scores.columns = ['MaNguoiDung', 'AvgScore']
+            df_sv = pd.merge(df_sv, avg_scores, on='MaNguoiDung', how='left')
+        else:
+            df_sv['AvgScore'] = 0.0
+
+        df_sv['AvgScore'] = df_sv['AvgScore'].fillna(0.0).round(1)
+
+        # Đếm số lượng sinh viên yếu (Điểm dưới 5.0 và có làm bài)
+        weak_count = int(((df_sv['AvgScore'] > 0) & (df_sv['AvgScore'] < 5.0)).sum())
+
+        # Gói dữ liệu theo từng lớp để gửi lên Web
+        classes_data = []
+        for class_name, group in df_sv.groupby('Lop'):
+            students = []
+            for _, row in group.iterrows():
+                students.append({
+                    "user_id": int(row['MaNguoiDung']),
+                    "username": str(row['TenDangNhap']),
+                    "fullname": str(row['HoTen']),
+                    "avg_score": float(row['AvgScore'])
+                })
+            
+            classes_data.append({
+                "class_name": str(class_name),
+                "student_count": len(students),
+                "students": students
+            })
 
         return {
             "status": "success",
