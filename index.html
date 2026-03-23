@@ -60,7 +60,6 @@
         .modal-body { flex: 1; padding: 30px 40px; overflow-y: auto; background-color: #fff; }
         .modal-footer { padding: 15px 30px; border-top: 1px solid var(--grey-light); display: flex; justify-content: flex-end; gap: 10px; background: var(--white); }
         
-        /* CSS CHUẨN THEO ẢNH 3 */
         .ex-heading { color: #303f9f; font-size: 18px; font-weight: bold; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
         .ex-content-text { color: #444; font-size: 15px; line-height: 1.6; margin-bottom: 20px; }
         .ex-req-text { color: #444; font-size: 15px; line-height: 1.6; margin-bottom: 20px; padding-left: 15px; }
@@ -101,6 +100,7 @@
                 <li class="menu-item active" onclick="changeSubject('CTDLGT', this)">📚 Cấu trúc dữ liệu & Giải thuật</li>
                 <li class="menu-item" onclick="changeSubject('KTLT', this)">📚 Kỹ thuật lập trình</li>
                 <li class="menu-item" onclick="changeSubject('OOP', this)">📚 Lập trình hướng đối tượng</li>
+                <li class="menu-item" onclick="changeSubject('NMLT', this)">📚 Nhập môn lập trình</li>
             </ul>
             <div class="logout-btn-container"><button class="logout-btn" onclick="logout()">🚪 Đăng Xuất</button></div>
         </div>
@@ -127,6 +127,37 @@
             </div>
 
             <div class="ai-widget-container" id="ai-recommendation-box"></div>
+        </div>
+    </div>
+
+    <div id="teacher-dashboard" class="dashboard hidden">
+        <div class="sidebar">
+            <div class="sidebar-header">👨‍🏫 Quản lý Giảng dạy</div>
+            <ul class="menu-list">
+                <li class="menu-item active">🏢 Tổng quan lớp học</li>
+            </ul>
+            <div class="logout-btn-container"><button class="logout-btn" onclick="logout()">🚪 Đăng Xuất</button></div>
+        </div>
+        <div class="main-content">
+            <div class="user-top-bar">
+                <div class="user-profile-info">
+                    <div class="avatar-circle" style="background: var(--warning);">GV</div>
+                    <div class="user-name-id">
+                        <h2 id="gv-fullname">Đang tải...</h2>
+                        <p>Khoa Công nghệ Thông tin</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="background: #fff3f3; border-left: 6px solid var(--danger); padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+                ⚠️ AI Cảnh báo: Có 5 sinh viên đang bị hổng kiến thức căn bản!
+            </div>
+            
+            <div style="background: #fff; padding: 25px; border-radius: 10px; box-shadow: var(--card-shadow); border-top: 4px solid var(--primary);">
+                <h3 style="margin-top:0; color:var(--primary);">Quản lý lớp: 22CT111 - Cấu trúc dữ liệu & Giải thuật</h3>
+                <p style="color: #555;">Sĩ số: 40 sinh viên</p>
+                <p style="color: #555;">Trạng thái hệ thống gợi ý AI: <span style="color: var(--success); font-weight: bold;">Đang Hoạt Động (Hybrid Filtering)</span></p>
+            </div>
         </div>
     </div>
 
@@ -194,10 +225,17 @@
                 
                 currentUserId = data.user_id;
                 document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('sv-fullname').innerText = data.full_name;
-                document.getElementById('sv-id-info').innerText = `Mã SV: ${user} | Lớp: 22CT111`;
-                document.getElementById('student-dashboard').classList.remove('hidden');
-                loadAIRecommendations(); 
+                
+                // ĐÃ FIX LOGIC PHÂN QUYỀN Ở ĐÂY
+                if (data.role === 'student') {
+                    document.getElementById('sv-fullname').innerText = data.full_name;
+                    document.getElementById('sv-id-info').innerText = `Mã SV: ${user} | Lớp: 22CT111`;
+                    document.getElementById('student-dashboard').classList.remove('hidden');
+                    loadAIRecommendations(); 
+                } else {
+                    document.getElementById('gv-fullname').innerText = "👨‍🏫 Giảng viên: " + data.full_name;
+                    document.getElementById('teacher-dashboard').classList.remove('hidden');
+                }
             } catch (error) { alert("Lỗi kết nối!"); btn.innerHTML = "Đăng Nhập"; btn.disabled = false; }
         }
 
@@ -257,7 +295,6 @@
             document.getElementById('modal-exercise-title').innerText = title;
             document.getElementById('work-submission').value = ""; 
             
-            // Hiện loading text tạm thời
             document.getElementById('modal-desc').innerHTML = "Đang tải dữ liệu từ SQL...";
             document.getElementById('modal-req').innerHTML = "Đang tải...";
             document.getElementById('modal-criteria').innerHTML = "<li>Đang tải...</li>";
@@ -268,7 +305,6 @@
             document.getElementById('modal-re-recommend-btn').classList.add('hidden'); 
             document.getElementById('submission-modal').classList.remove('hidden');
 
-            // GỌI API LẤY CHI TIẾT TỪ SQL
             try {
                 const res = await fetch(`${SERVER_URL}/api/exercise-details/${exId}`);
                 const details = await res.json();
