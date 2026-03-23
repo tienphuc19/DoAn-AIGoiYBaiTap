@@ -48,14 +48,9 @@ def load_data_from_sql():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi SQL: {str(e)}")
 
-# ==========================================
-# API MỚI: KÉO MÔ TẢ, YÊU CẦU & TIÊU CHÍ TỪ SQL
-# ==========================================
 @app.get("/api/exercise-details/{ex_id}", tags=["Sinh Viên"])
 def get_exercise_details(ex_id: int):
     conn = get_db_connection()
-    
-    # Dữ liệu mặc định (Dành riêng cho bài BFS ID 374 để khớp 100% với ảnh demo của bạn)
     mota = "Thuật toán BFS mô phỏng việc lan tỏa như sóng nước, thăm tất cả các đỉnh gần gốc trước khi đi xa hơn. Đây là nền tảng để tìm đường đi ngắn nhất trong đồ thị không có trọng số." if ex_id == 374 else "Đang cập nhật mô tả từ cơ sở dữ liệu."
     yeucau = "1. Sử dụng Queue để cài đặt thuật toán BFS. In ra thứ tự các đỉnh được thăm bắt đầu từ một đỉnh s cho trước." if ex_id == 374 else "1. Hoàn thành bài tập theo yêu cầu đề bài."
     criteria_list = [
@@ -66,7 +61,6 @@ def get_exercise_details(ex_id: int):
     ] if ex_id == 374 else []
 
     try:
-        # 1. Quét bảng BAITAP lấy Mô Tả & Yêu Cầu
         df_bt = pd.read_sql(f"SELECT * FROM BAITAP WHERE Id = {ex_id}", conn)
         if not df_bt.empty:
             if 'MoTa' in df_bt.columns and pd.notna(df_bt['MoTa'].iloc[0]) and str(df_bt['MoTa'].iloc[0]).strip() != "":
@@ -74,11 +68,8 @@ def get_exercise_details(ex_id: int):
             if 'YeuCau' in df_bt.columns and pd.notna(df_bt['YeuCau'].iloc[0]) and str(df_bt['YeuCau'].iloc[0]).strip() != "":
                 yeucau = str(df_bt['YeuCau'].iloc[0])
 
-        # 2. Quét bảng TIEUCHI_DANGBAI lấy Tiêu Chí Chấm
         df_tc = pd.read_sql("SELECT * FROM TIEUCHI_DANGBAI", conn)
         df_tc_filtered = pd.DataFrame()
-        
-        # Tự động dò tìm khóa ngoại (MaBaiTap hoặc MaDangBai)
         if 'MaBaiTap' in df_tc.columns:
             df_tc_filtered = df_tc[df_tc['MaBaiTap'] == ex_id]
         elif 'MaDangBai' in df_tc.columns and 'MaDangBai' in df_bt.columns:
@@ -86,19 +77,16 @@ def get_exercise_details(ex_id: int):
             df_tc_filtered = df_tc[df_tc['MaDangBai'] == madangbai]
 
         if not df_tc_filtered.empty:
-            criteria_list = [] # Xóa mặc định nếu tìm thấy trong SQL
-            # Dò tìm tên cột chứa Tiêu chí và Điểm
+            criteria_list = []
             name_col = next((col for col in ['TenTieuChi', 'NoiDung', 'TieuChi'] if col in df_tc.columns), None)
             score_col = next((col for col in ['Diem', 'TrongSo', 'Score'] if col in df_tc.columns), None)
-
             for _, row in df_tc_filtered.iterrows():
                 name = str(row[name_col]) if name_col else "Tiêu chí thành phần"
                 score = str(int(row[score_col])) if score_col and pd.notna(row[score_col]) else "0"
                 criteria_list.append({"name": name, "score": score})
     except Exception as e:
-        print(f"Lỗi truy xuất SQL chi tiết bài tập: {e}")
+        print(f"Lỗi truy xuất SQL: {e}")
 
-    # Fallback nếu bài tập đó chưa có tiêu chí trong SQL
     if len(criteria_list) == 0:
         criteria_list = [
             {"name": "Giải thuật chính xác, đáp ứng yêu cầu bài toán", "score": 40},
@@ -107,12 +95,7 @@ def get_exercise_details(ex_id: int):
         ]
 
     conn.close()
-    return {
-        "status": "success",
-        "mota": mota,
-        "yeucau": yeucau,
-        "criteria": criteria_list
-    }
+    return {"status": "success", "mota": mota, "yeucau": yeucau, "criteria": criteria_list}
 
 class MockGradeRequest(BaseModel):
     student_id: int
@@ -136,11 +119,6 @@ def mock_grade_and_submit_result(request: MockGradeRequest, x_user_role: str = H
         conn.close()
         return {"status": "success", "score": final_grade, "passed": final_grade >= 5.0, "message": f"🤖 Đã chấm tự động dựa trên tiêu chí SQL."}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
-
-class RecommendRequest(BaseModel):
-    student_id: int
-    top_k: int = 6
-    subject_code: str = ""
 
 @app.post("/api/recommend", tags=["Sinh Viên"])
 def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Header(None, description="Bắt buộc nhập 'student'")):
@@ -227,6 +205,45 @@ def login_user(request: LoginRequest):
         if df_user.empty: return {"status": "error", "message": "Sai tên đăng nhập hoặc mật khẩu!"}
         return {"status": "success", "role": df_user.iloc[0]['VaiTro'], "user_id": int(df_user.iloc[0]['MaNguoiDung']), "full_name": df_user.iloc[0]['HoTen']}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+# ==========================================
+# API MỚI: TỔNG QUAN LỚP HỌC CHO GIẢNG VIÊN
+# ==========================================
+@app.get("/api/teacher/overview", tags=["Giảng Viên"])
+def get_teacher_overview(x_user_role: str = Header(None, description="Bắt buộc nhập 'teacher'")):
+    if x_user_role != "teacher": raise HTTPException(status_code=403, detail="Cấm truy cập!")
+    try:
+        conn = get_db_connection()
+        # Lấy tất cả sinh viên
+        df_sv = pd.read_sql("SELECT MaNguoiDung, HoTen FROM TAIKHOAN WHERE VaiTro = 'student'", conn)
+        # Lấy tất cả điểm
+        df_diem = pd.read_sql("SELECT MaSinhVien, DiemSo FROM AI_LichSuLamBai", conn)
+        conn.close()
+
+        if df_sv.empty: return {"status": "success", "weak_students_count": 0, "classes": []}
+
+        # Bóc tách tên lớp từ dấu ngoặc đơn (Ví dụ: "Sinh Viên ... (22CT111)" -> "22CT111")
+        df_sv['Lop'] = df_sv['HoTen'].str.extract(r'\((.*?)\)')[0]
+        df_sv['Lop'] = df_sv['Lop'].fillna('Không xác định')
+
+        # Gom nhóm và đếm số lượng sinh viên mỗi lớp
+        class_counts = df_sv['Lop'].value_counts().reset_index()
+        class_counts.columns = ['class_name', 'student_count']
+        classes_data = class_counts.to_dict('records')
+
+        # Tính điểm trung bình để tìm ra những sinh viên yếu (Dưới 5.0 điểm)
+        weak_count = 0
+        if not df_diem.empty:
+            avg_scores = df_diem.groupby('MaSinhVien')['DiemSo'].mean().reset_index()
+            weak_count = int((avg_scores['DiemSo'] < 5.0).sum())
+
+        return {
+            "status": "success",
+            "weak_students_count": weak_count,
+            "classes": classes_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 def serve_frontend():
