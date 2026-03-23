@@ -120,6 +120,14 @@ def mock_grade_and_submit_result(request: MockGradeRequest, x_user_role: str = H
         return {"status": "success", "score": final_grade, "passed": final_grade >= 5.0, "message": f"🤖 Đã chấm tự động dựa trên tiêu chí SQL."}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+# ===============================================
+# ĐÃ THÊM LẠI KHAI BÁO CLASS RecommendRequest Ở ĐÂY
+# ===============================================
+class RecommendRequest(BaseModel):
+    student_id: int
+    top_k: int = 6
+    subject_code: str = ""
+
 @app.post("/api/recommend", tags=["Sinh Viên"])
 def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Header(None, description="Bắt buộc nhập 'student'")):
     if x_user_role != "student": raise HTTPException(status_code=403, detail="Cấm truy cập!")
@@ -206,32 +214,24 @@ def login_user(request: LoginRequest):
         return {"status": "success", "role": df_user.iloc[0]['VaiTro'], "user_id": int(df_user.iloc[0]['MaNguoiDung']), "full_name": df_user.iloc[0]['HoTen']}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
-# ==========================================
-# API MỚI: TỔNG QUAN LỚP HỌC CHO GIẢNG VIÊN
-# ==========================================
 @app.get("/api/teacher/overview", tags=["Giảng Viên"])
 def get_teacher_overview(x_user_role: str = Header(None, description="Bắt buộc nhập 'teacher'")):
     if x_user_role != "teacher": raise HTTPException(status_code=403, detail="Cấm truy cập!")
     try:
         conn = get_db_connection()
-        # Lấy tất cả sinh viên
         df_sv = pd.read_sql("SELECT MaNguoiDung, HoTen FROM TAIKHOAN WHERE VaiTro = 'student'", conn)
-        # Lấy tất cả điểm
         df_diem = pd.read_sql("SELECT MaSinhVien, DiemSo FROM AI_LichSuLamBai", conn)
         conn.close()
 
         if df_sv.empty: return {"status": "success", "weak_students_count": 0, "classes": []}
 
-        # Bóc tách tên lớp từ dấu ngoặc đơn (Ví dụ: "Sinh Viên ... (22CT111)" -> "22CT111")
         df_sv['Lop'] = df_sv['HoTen'].str.extract(r'\((.*?)\)')[0]
         df_sv['Lop'] = df_sv['Lop'].fillna('Không xác định')
 
-        # Gom nhóm và đếm số lượng sinh viên mỗi lớp
         class_counts = df_sv['Lop'].value_counts().reset_index()
         class_counts.columns = ['class_name', 'student_count']
         classes_data = class_counts.to_dict('records')
 
-        # Tính điểm trung bình để tìm ra những sinh viên yếu (Dưới 5.0 điểm)
         weak_count = 0
         if not df_diem.empty:
             avg_scores = df_diem.groupby('MaSinhVien')['DiemSo'].mean().reset_index()
