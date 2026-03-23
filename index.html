@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Gợi Ý Bài Tập - Tích Hợp AI Chấm Điểm</title>
+    <title>Hệ Thống Gợi Ý Bài Tập - AI Phân Tích</title>
     <style>
         :root { 
             --primary: #3f51b5; --primary-hover: #303f9f; --bg: #f4f7f6; --text: #333; --muted: #666; 
@@ -51,22 +51,26 @@
         .tag-warning { background: #fff3e0; color: var(--warning); border: 1px solid #ffe0b2;}
         .tag-success { background: #e8f5e9; color: var(--success); border: 1px solid #c8e6c9;}
 
-        .class-card { background: var(--white); padding: 20px; border-radius: 10px; box-shadow: var(--card-shadow); margin-bottom: 15px; border-left: 5px solid var(--primary);}
-
-        .modal { display: flex; justify-content: center; align-items: center; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); overflow: hidden;}
-        .modal-content { background-color: var(--white); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 80%; max-width: 800px; height: 90%; max-height: 700px; overflow: hidden; display: flex; flex-direction: column; }
-        .modal-header { padding: 15px 25px; border-bottom: 1px solid var(--grey-light); display: flex; justify-content: space-between; align-items: center; background: var(--white);}
-        .modal-header h2 { margin: 0; font-size: 20px; color: var(--primary); }
+        /* MODAL KHUNG NỘP BÀI */
+        .modal { display: flex; justify-content: center; align-items: center; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); overflow: hidden;}
+        .modal-content { background-color: var(--white); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); width: 85%; max-width: 900px; height: 90%; max-height: 800px; overflow: hidden; display: flex; flex-direction: column; }
+        .modal-header { padding: 20px 30px; border-bottom: 1px solid var(--grey-light); display: flex; justify-content: space-between; align-items: center; background: var(--white);}
+        .modal-header h2 { margin: 0; font-size: 22px; color: var(--primary); }
         .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .close:hover { color: var(--danger); }
-        .modal-body { flex: 1; padding: 25px; overflow-y: auto; background-color: #f9f9f9; }
-        .modal-footer { padding: 15px 25px; border-top: 1px solid var(--grey-light); display: flex; justify-content: flex-end; gap: 10px; background: var(--white); }
+        .modal-body { flex: 1; padding: 30px; overflow-y: auto; background-color: #fcfcfc; }
+        .modal-footer { padding: 15px 30px; border-top: 1px solid var(--grey-light); display: flex; justify-content: flex-end; gap: 10px; background: var(--white); }
         
-        #work-submission { width: 100%; height: 350px; padding: 15px; border-radius: 8px; border: 1px solid #ccc; font-family: 'Courier New', monospace; box-sizing: border-box; resize: none; }
-        .modal-btn { padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; border: none; transition: 0.2s; }
-        .close-btn { background-color: #eee; color: #555; }
-        .close-btn:hover { background-color: #ddd; }
-        .submit-btn { background-color: var(--ai-primary); color: var(--white); }
+        /* CSS MỚI CHO PHẦN CHI TIẾT BÀI TẬP */
+        .exercise-detail-section { margin-bottom: 25px; text-align: left; }
+        .exercise-detail-section h3 { color: #283593; font-size: 18px; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px; margin-bottom: 12px; }
+        .exercise-detail-section .content-box { color: #444; font-size: 15px; line-height: 1.6; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0;}
+        
+        #work-submission { width: 100%; height: 250px; padding: 15px; border-radius: 8px; border: 1px solid #ccc; font-family: 'Courier New', monospace; font-size: 14px; box-sizing: border-box; resize: none; background: #fafafa;}
+        .modal-btn { padding: 12px 25px; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; border: none; transition: 0.2s; }
+        .close-btn { background-color: #e0e0e0; color: #333; }
+        .close-btn:hover { background-color: #ccc; }
+        .submit-btn { background-color: var(--ai-primary); color: var(--white); box-shadow: 0 4px 6px rgba(33, 150, 243, 0.3);}
         .submit-btn:hover { background-color: #1976D2; transform: translateY(-2px); }
 
         .submission-loading { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center;}
@@ -113,16 +117,18 @@
                     </div>
                 </div>
             </div>
+            
             <div class="grid-stats">
                 <div class="stat-card level">
-                    <div style="color: #666; font-size: 14px;">🎓 Báo Cáo Học Lực</div>
-                    <div class="stat-value" id="ai-level-display">Đang tải dữ liệu...</div>
+                    <div style="color: #666; font-size: 14px; font-weight: bold;">🎓 BÁO CÁO HỌC LỰC</div>
+                    <div class="stat-value" id="ai-level-display" style="margin-top: 15px; line-height: 1.4;">Đang tải dữ liệu...</div>
                 </div>
                 <div class="stat-card" style="border-top-color: var(--ai-primary);">
-                    <div style="color: #666; font-size: 14px;">📊 Hệ Thống Gợi Ý (AI CF)</div>
-                    <div style="font-size: 14px; font-weight: bold; margin-top: 10px;" id="ai-cf-status" style="color: var(--warning);">Đang kiểm tra dữ liệu...</div>
+                    <div style="color: #666; font-size: 14px; font-weight: bold;">📊 HỆ THỐNG GỢI Ý (AI CF)</div>
+                    <div style="font-size: 15px; font-weight: bold; margin-top: 15px;" id="ai-cf-status" style="color: var(--warning);">Đang kiểm tra dữ liệu...</div>
                 </div>
             </div>
+
             <div class="ai-widget-container" id="ai-recommendation-box">
             </div>
         </div>
@@ -139,7 +145,6 @@
             <div style="background: #fff3f3; border-left: 6px solid var(--danger); padding: 15px; border-radius: 8px; margin-bottom: 25px;">
                 ⚠️ Có 5 sinh viên cần gợi ý bài tập cơ bản!
             </div>
-            <div class="class-card">Cấu trúc dữ liệu & Giải thuật (CTDLGT_01) - Sĩ số: 45</div>
         </div>
     </div>
 
@@ -151,31 +156,47 @@
             </div>
             <div class="modal-body" id="modal-content-area">
                 <div id="submission-form-view">
-                    <h3 style="color: #555; margin-bottom: 5px;">🤖 Tiêu chí đánh giá của AI:</h3>
-                    <div style="background: #e1f5fe; border: 1px solid #b3e5fc; padding: 15px; border-radius: 8px; color: #0277bd; font-size: 14px; margin-bottom: 20px;">
-                        Tiêu chí 1: Giải thuật đúng (3.0đ) | Tiêu chí 2: Độ phức tạp tối ưu (3.0đ) | Tiêu chí 3: Coding style chuẩn (2.0đ) | Tiêu chí 4: Comment rõ ràng (2.0đ). 
-                        <br><i>Hệ thống AI sẽ quét code của bạn và chấm điểm tự động.</i>
+                    
+                    <div class="exercise-detail-section">
+                        <h3>Mô tả</h3>
+                        <div class="content-box" id="modal-desc">Đang tải mô tả...</div>
                     </div>
-                    <p style="color: var(--muted); margin-bottom: 8px;">Dán bài làm của bạn (Code) vào khung bên dưới:</p>
-                    <textarea id="work-submission" placeholder="// Dán code C++, Java hoặc Python của bạn vào đây..."></textarea>
+                    
+                    <div class="exercise-detail-section">
+                        <h3>Yêu cầu</h3>
+                        <div class="content-box" id="modal-req">Đang tải yêu cầu...</div>
+                    </div>
+
+                    <div class="exercise-detail-section">
+                        <h3>🤖 Tiêu chí chấm (AI)</h3>
+                        <div style="background: #e8f5e9; border: 1px solid #c8e6c9; padding: 15px; border-radius: 8px; color: #2e7d32; font-size: 14px;">
+                            • Giải thuật đúng (3.0đ)<br>
+                            • Độ phức tạp tối ưu (3.0đ)<br>
+                            • Coding style chuẩn & Comment rõ ràng (4.0đ)
+                        </div>
+                    </div>
+
+                    <p style="color: var(--primary); font-weight: bold; margin-bottom: 8px;">Dán bài làm của bạn (Code):</p>
+                    <textarea id="work-submission" placeholder="// Viết code giải bài toán tại đây..."></textarea>
                 </div>
+                
                 <div id="grading-result-view" class="hidden submission-loading">
                     <div id="ai-grading-spinner">
                         <h2 style="color: var(--ai-primary);">🤖 AI Đang Quét Code & Chấm Điểm...</h2>
                         <div class="stat-value">Xin vui lòng chờ giây lát...</div>
                     </div>
-                    <div id="ai-grade-final" class="hidden stat-card">
-                        <div style="color: #666; font-size: 14px;">🤖 Kết quả AI chấm điểm:</div>
-                        <div class="stat-value" id="ai-final-score">0.0 Điểm</div>
-                        <span class="tag-status" id="ai-passed-status">CHỜ...</span>
-                        <div style="color: #666; font-size: 14px; margin-top: 15px; text-align: left;" id="ai-grading-message">Đang tính toán gợi ý tiếp theo...</div>
+                    <div id="ai-grade-final" class="hidden stat-card" style="width: 400px; padding: 40px;">
+                        <div style="color: #666; font-size: 16px; margin-bottom: 10px;">🤖 Kết quả AI chấm điểm:</div>
+                        <div class="stat-value" id="ai-final-score" style="font-size: 36px; color: var(--primary);">0.0 Điểm</div>
+                        <div style="margin-top: 15px;"><span class="tag-status" id="ai-passed-status" style="font-size: 14px; padding: 8px 15px;">CHỜ...</span></div>
+                        <div style="color: #666; font-size: 14px; margin-top: 20px; line-height: 1.5;" id="ai-grading-message">Đang tính toán gợi ý tiếp theo...</div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer" id="modal-footer-area">
                 <button class="modal-btn close-btn" onclick="closeSubmissionModal()">Đóng</button>
                 <button class="modal-btn submit-btn" onclick="submitWorkToMockAI()">🤖 Chấm Điểm & Nộp Bài</button>
-                <button class="modal-btn submit-btn hidden" id="modal-re-recommend-btn" onclick="closeSubmissionModal()">🚪 Đóng & Tải Lộ Trình Mới</button>
+                <button class="modal-btn submit-btn hidden" id="modal-re-recommend-btn" onclick="closeSubmissionModal()">🚪 Cập Nhật Lộ Trình Mới</button>
             </div>
         </div>
     </div>
@@ -185,6 +206,9 @@
         let currentUserId = null;
         let currentSubject = 'CTDLGT'; 
         let currentExId = null; 
+        
+        // Biến lưu trữ toàn bộ bài tập gợi ý để lấy Mô tả, Yêu cầu đưa vào Khung Modal
+        let globalRecommendations = []; 
 
         async function handleLoginFlow() {
             const user = document.getElementById('txtUsername').value;
@@ -227,37 +251,44 @@
                 });
                 const data = await response.json();
 
-                // Đã thay đổi: Hiển thị Điểm và Xếp Loại Học Lực
+                // 1. CẬP NHẬT ĐIỂM & XẾP LOẠI (Bảo đảm hiện đúng như bạn yêu cầu)
                 if(data.avg_score > 0) {
                     let rankColor = data.academic_rank == "Yếu" ? "var(--danger)" : (data.academic_rank == "Khá" || data.academic_rank == "Giỏi" ? "var(--success)" : "var(--warning)");
-                    document.getElementById('ai-level-display').innerHTML = `${data.avg_score} Điểm <br><span style="font-size:16px; color:${rankColor};">Học lực: ${data.academic_rank}</span>`;
+                    document.getElementById('ai-level-display').innerHTML = `
+                        <span style="font-size: 32px; color: var(--primary);">${data.avg_score} Điểm</span> <br>
+                        <span style="font-size: 16px; color: ${rankColor}; display: inline-block; margin-top: 5px; font-weight: bold; background: #f0f4f8; padding: 5px 10px; border-radius: 4px;">Xếp loại: ${data.academic_rank}</span>
+                    `;
                 } else {
-                    document.getElementById('ai-level-display').innerText = `Chưa có điểm`;
+                    document.getElementById('ai-level-display').innerText = `Chưa có dữ liệu điểm`;
                 }
                 
                 const cfStatus = document.getElementById('ai-cf-status');
                 if(data.cf_error_message.includes("ACTIVE")) {
-                    cfStatus.innerText = "✅ Đang HOẠT ĐỘNG (Item-Based CF)"; cfStatus.style.color = "var(--success)";
+                    cfStatus.innerHTML = "✅ Thuật toán lọc cộng tác (Item-Based CF) <br><span style='color: var(--success); font-size: 13px;'>Đang Phân Tích Dữ Liệu Lớp Học</span>"; 
                 } else {
                     cfStatus.innerText = "❌ Đã TẮT (" + data.cf_error_message.substring(0, 30) + "...)"; cfStatus.style.color = "var(--danger)";
                 }
 
                 if(data.recommendations && data.recommendations.length > 0) {
-                    let htmlList = `<h3 style="color: #333; margin-bottom: 20px;">🤖 Lộ Trình Gợi Ý Tự Động</h3>`;
+                    // Lưu vào biến global để truyền sang Modal
+                    globalRecommendations = data.recommendations;
+                    
+                    let htmlList = `<h3 style="color: #333; margin-bottom: 20px;">🤖 Lộ Trình Gợi Ý Tự Động Từ AI</h3>`;
                     data.recommendations.forEach(item => {
                         let levelName = item.Difficulty == 1 ? "Dễ" : (item.Difficulty == 2 ? "Trung Bình" : "Khó");
                         let levelTag = item.Difficulty == 1 ? "tag-success" : (item.Difficulty == 2 ? "tag-warning" : "tag-danger");
                         htmlList += `
-                            <div style="padding: 18px; background: #f9f9f9; border-radius: 8px; border-left: 5px solid #2196F3; margin-top: 15px; cursor:pointer; transition:0.2s;" onclick="openSubmissionModal(${item.ExerciseID}, '${item.Title.replace("'", "\\'")}')">
-                                <b style="font-size: 16px;">ID: ${item.ExerciseID} - ${item.Title}</b><br>
-                                <div style="margin-top: 8px;">
-                                    <span style="color: #666; font-size: 14px;">Chủ đề: ${item.Tags}</span> <span class="tag-status ${levelTag}" style="margin-left: 10px;">Mức: ${levelName}</span>
+                            <div style="padding: 18px; background: #fff; border-radius: 8px; border-left: 5px solid #2196F3; margin-top: 15px; cursor:pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition:0.2s;" onmouseover="this.style.transform='translateX(5px)'" onmouseout="this.style.transform='translateX(0)'" onclick="openSubmissionModal(${item.ExerciseID})">
+                                <b style="font-size: 16px; color: #283593;">ID: ${item.ExerciseID} - ${item.Title}</b><br>
+                                <div style="margin-top: 10px;">
+                                    <span style="color: #666; font-size: 14px; background: #f0f0f0; padding: 3px 8px; border-radius: 4px;">Chủ đề: ${item.Tags}</span> 
+                                    <span class="tag-status ${levelTag}" style="margin-left: 10px;">Mức: ${levelName}</span>
                                 </div>
                             </div>
                         `;
                     });
                     aiContainer.innerHTML = htmlList;
-                } else { aiContainer.innerHTML = `<h3>🤖 Bạn đã làm hết bài tập cho môn học này!</h3>`; }
+                } else { aiContainer.innerHTML = `<h3>🤖 Bạn đã hoàn thành toàn bộ bài tập hiện có của môn này!</h3>`; }
             } catch (error) { aiContainer.innerHTML = `<h3 style="color:red;">Lỗi kết nối bộ não AI!</h3>`; }
         }
 
@@ -269,9 +300,20 @@
             loadAIRecommendations();
         }
 
-        function openSubmissionModal(exId, exTitle) {
+        function openSubmissionModal(exId) {
             currentExId = exId;
-            document.getElementById('modal-exercise-title').innerText = `ID ${exId} - Nộp Bài: ${exTitle}`;
+            
+            // Lấy thông tin bài tập từ biến global để hiển thị Mô tả & Yêu cầu
+            const exerciseInfo = globalRecommendations.find(ex => ex.ExerciseID === exId);
+            
+            if(exerciseInfo) {
+                document.getElementById('modal-exercise-title').innerText = `ID ${exId} - ${exerciseInfo.Title}`;
+                
+                // Đẩy Mô tả và Yêu cầu vào khung Modal
+                document.getElementById('modal-desc').innerHTML = exerciseInfo.Description.replace(/\n/g, '<br>');
+                document.getElementById('modal-req').innerHTML = exerciseInfo.Requirement.replace(/\n/g, '<br>');
+            }
+
             document.getElementById('work-submission').value = ""; 
             document.getElementById('submission-form-view').classList.remove('hidden');
             document.getElementById('grading-result-view').classList.add('hidden');
@@ -313,9 +355,9 @@
                 
                 const passedStatus = document.getElementById('ai-passed-status');
                 if(data.passed) {
-                    passedStatus.innerText = "✅ ĐÃ VƯỢT QUA"; passedStatus.className = "tag-status tag-success";
+                    passedStatus.innerText = "✅ ĐÃ VƯỢT QUA BÀI TẬP"; passedStatus.className = "tag-status tag-success";
                 } else {
-                    passedStatus.innerText = "❌ CHƯA ĐẠT"; passedStatus.className = "tag-status tag-danger";
+                    passedStatus.innerText = "❌ CHƯA ĐẠT YÊU CẦU"; passedStatus.className = "tag-status tag-danger";
                 }
 
                 document.getElementById('modal-re-recommend-btn').classList.remove('hidden');
