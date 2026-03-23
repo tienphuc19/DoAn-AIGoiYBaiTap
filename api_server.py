@@ -120,9 +120,9 @@ def mock_grade_and_submit_result(request: MockGradeRequest, x_user_role: str = H
         return {"status": "success", "score": final_grade, "passed": final_grade >= 5.0, "message": f"🤖 Đã chấm tự động dựa trên tiêu chí SQL."}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
-# ===============================================
-# ĐÃ THÊM LẠI KHAI BÁO CLASS RecommendRequest Ở ĐÂY
-# ===============================================
+# ==========================================
+# CÁI KHUÔN NÀY ĐÃ ĐƯỢC THÊM LẠI ĐẦY ĐỦ RỒI ĐÂY
+# ==========================================
 class RecommendRequest(BaseModel):
     student_id: int
     top_k: int = 6
