@@ -6,7 +6,7 @@
     <title>Hệ Thống Gợi Ý Bài Tập - AI Phân Tích</title>
     <style>
         :root { 
-            --primary: #3f51b5; --primary-hover: #303f9f; --bg: #f4f7f6; --text: #333; --muted: #666; 
+            --primary: #303f9f; --primary-hover: #1a237e; --bg: #f4f7f6; --text: #333; --muted: #666; 
             --danger: #f44336; --success: #4CAF50; --warning: #ff9800; --ai-primary: #2196F3;
             --white: #fff; --grey-light: #eee; --card-shadow: 0 4px 8px rgba(0,0,0,0.08); 
         }
@@ -31,7 +31,6 @@
         .menu-item.active { background: #e8eaf6; border-left: 4px solid var(--primary); color: var(--primary); font-weight: bold; }
         .logout-btn-container { margin-top: auto; padding: 15px 25px; border-top: 1px solid var(--grey-light); }
         .logout-btn { color: var(--danger); cursor: pointer; font-weight: bold; width: 100%; padding: 10px; background: transparent; border: 2px solid var(--danger); border-radius: 6px; transition: 0.2s;}
-        .logout-btn:hover { background: #ffebee; }
 
         .main-content { flex: 1; padding: 30px; overflow-y: auto; }
         .user-top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--white); padding: 15px 25px; border-radius: 10px; box-shadow: var(--card-shadow); margin-bottom: 30px; }
@@ -51,28 +50,30 @@
         .tag-warning { background: #fff3e0; color: var(--warning); border: 1px solid #ffe0b2;}
         .tag-success { background: #e8f5e9; color: var(--success); border: 1px solid #c8e6c9;}
 
-        /* MODAL KHUNG NỘP BÀI */
+        /* MODAL KHUNG NỘP BÀI CHUẨN MẪU */
         .modal { display: flex; justify-content: center; align-items: center; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); overflow: hidden;}
         .modal-content { background-color: var(--white); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); width: 85%; max-width: 900px; height: 90%; max-height: 800px; overflow: hidden; display: flex; flex-direction: column; }
         .modal-header { padding: 20px 30px; border-bottom: 1px solid var(--grey-light); display: flex; justify-content: space-between; align-items: center; background: var(--white);}
-        .modal-header h2 { margin: 0; font-size: 22px; color: var(--primary); }
+        .modal-header h2 { margin: 0; font-size: 24px; color: var(--primary); font-weight: bold; }
         .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .close:hover { color: var(--danger); }
-        .modal-body { flex: 1; padding: 30px; overflow-y: auto; background-color: #fcfcfc; }
+        .modal-body { flex: 1; padding: 30px 40px; overflow-y: auto; background-color: #fff; }
         .modal-footer { padding: 15px 30px; border-top: 1px solid var(--grey-light); display: flex; justify-content: flex-end; gap: 10px; background: var(--white); }
         
-        /* CSS MỚI CHO PHẦN CHI TIẾT BÀI TẬP */
-        .exercise-detail-section { margin-bottom: 25px; text-align: left; }
-        .exercise-detail-section h3 { color: #283593; font-size: 18px; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px; margin-bottom: 12px; }
-        .exercise-detail-section .content-box { color: #444; font-size: 15px; line-height: 1.6; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0;}
+        /* CSS CHUẨN THEO ẢNH 3 */
+        .ex-heading { color: #303f9f; font-size: 18px; font-weight: bold; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .ex-content-text { color: #444; font-size: 15px; line-height: 1.6; margin-bottom: 20px; }
+        .ex-req-text { color: #444; font-size: 15px; line-height: 1.6; margin-bottom: 20px; padding-left: 15px; }
         
+        .criteria-list { padding-left: 25px; color: #444; font-size: 15px; line-height: 1.8; margin-bottom: 30px;}
+        .criteria-list li { margin-bottom: 10px; }
+        .criteria-score { color: #888; font-size: 14px; }
+
         #work-submission { width: 100%; height: 250px; padding: 15px; border-radius: 8px; border: 1px solid #ccc; font-family: 'Courier New', monospace; font-size: 14px; box-sizing: border-box; resize: none; background: #fafafa;}
         .modal-btn { padding: 12px 25px; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; border: none; transition: 0.2s; }
         .close-btn { background-color: #e0e0e0; color: #333; }
-        .close-btn:hover { background-color: #ccc; }
         .submit-btn { background-color: var(--ai-primary); color: var(--white); box-shadow: 0 4px 6px rgba(33, 150, 243, 0.3);}
         .submit-btn:hover { background-color: #1976D2; transform: translateY(-2px); }
-
         .submission-loading { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center;}
     </style>
 </head>
@@ -81,7 +82,6 @@
     <div id="login-screen">
         <div class="login-box">
             <h2>Hệ Thống Gợi Ý Bài Tập</h2>
-            <p style="color: var(--muted); margin-bottom: 30px;">Đăng nhập để nhận lộ trình AI</p>
             <div class="login-form-group">
                 <label>Tên Đăng Nhập</label>
                 <input type="text" id="txtUsername" placeholder="Ví dụ: tienphuc" value="tienphuc">
@@ -90,7 +90,7 @@
                 <label>Mật Khẩu</label>
                 <input type="password" id="txtPassword" placeholder="Nhập mật khẩu" value="123456">
             </div>
-            <button class="main-login-btn" onclick="handleLoginFlow()">Xác Nhận Đăng Nhập</button>
+            <button class="main-login-btn" onclick="handleLoginFlow()">Đăng Nhập</button>
         </div>
     </div>
 
@@ -101,11 +101,8 @@
                 <li class="menu-item active" onclick="changeSubject('CTDLGT', this)">📚 Cấu trúc dữ liệu & Giải thuật</li>
                 <li class="menu-item" onclick="changeSubject('KTLT', this)">📚 Kỹ thuật lập trình</li>
                 <li class="menu-item" onclick="changeSubject('OOP', this)">📚 Lập trình hướng đối tượng</li>
-                <li class="menu-item" onclick="changeSubject('NMLT', this)">📚 Nhập môn lập trình</li>
             </ul>
-            <div class="logout-btn-container">
-                <button class="logout-btn" onclick="logout()">🚪 Đăng Xuất</button>
-            </div>
+            <div class="logout-btn-container"><button class="logout-btn" onclick="logout()">🚪 Đăng Xuất</button></div>
         </div>
         <div class="main-content">
             <div class="user-top-bar">
@@ -113,7 +110,7 @@
                     <div class="avatar-circle">SV</div>
                     <div class="user-name-id">
                         <h2 id="sv-fullname">Đang tải...</h2>
-                        <p id="sv-id-info">Mã SV: Đang tải... | Lớp: 22CT111 | Ngành: CNTT</p>
+                        <p id="sv-id-info">Mã SV: Đang tải... | Lớp: 22CT111</p>
                     </div>
                 </div>
             </div>
@@ -121,75 +118,49 @@
             <div class="grid-stats">
                 <div class="stat-card level">
                     <div style="color: #666; font-size: 14px; font-weight: bold;">🎓 BÁO CÁO HỌC LỰC</div>
-                    <div class="stat-value" id="ai-level-display" style="margin-top: 15px; line-height: 1.4;">Đang tải dữ liệu...</div>
+                    <div class="stat-value" id="ai-level-display" style="margin-top: 15px; line-height: 1.4;">Đang tải...</div>
                 </div>
                 <div class="stat-card" style="border-top-color: var(--ai-primary);">
                     <div style="color: #666; font-size: 14px; font-weight: bold;">📊 HỆ THỐNG GỢI Ý (AI CF)</div>
-                    <div style="font-size: 15px; font-weight: bold; margin-top: 15px;" id="ai-cf-status" style="color: var(--warning);">Đang kiểm tra dữ liệu...</div>
+                    <div style="font-size: 15px; font-weight: bold; margin-top: 15px;" id="ai-cf-status">Đang tải...</div>
                 </div>
             </div>
 
-            <div class="ai-widget-container" id="ai-recommendation-box">
-            </div>
-        </div>
-    </div>
-
-    <div id="teacher-dashboard" class="dashboard hidden">
-        <div class="sidebar">
-            <div class="sidebar-header">👨‍🏫 Quản lý Giảng dạy</div>
-            <ul class="menu-list"><li class="menu-item active">🏢 Tổng quan</li></ul>
-            <div class="logout-btn-container"><button class="logout-btn" onclick="logout()">🚪 Đăng Xuất</button></div>
-        </div>
-        <div class="main-content">
-            <h2 id="gv-fullname">Chào Giảng viên...</h2>
-            <div style="background: #fff3f3; border-left: 6px solid var(--danger); padding: 15px; border-radius: 8px; margin-bottom: 25px;">
-                ⚠️ Có 5 sinh viên cần gợi ý bài tập cơ bản!
-            </div>
+            <div class="ai-widget-container" id="ai-recommendation-box"></div>
         </div>
     </div>
 
     <div id="submission-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modal-exercise-title">Làm Bài Tập</h2>
+                <h2 id="modal-exercise-title">Đang tải...</h2>
                 <span class="close" onclick="closeSubmissionModal()">&times;</span>
             </div>
             <div class="modal-body" id="modal-content-area">
                 <div id="submission-form-view">
                     
-                    <div class="exercise-detail-section">
-                        <h3>Mô tả</h3>
-                        <div class="content-box" id="modal-desc">Đang tải mô tả...</div>
-                    </div>
+                    <div class="ex-heading">Mô tả</div>
+                    <div class="ex-content-text" id="modal-desc">Đang truy xuất dữ liệu từ SQL...</div>
                     
-                    <div class="exercise-detail-section">
-                        <h3>Yêu cầu</h3>
-                        <div class="content-box" id="modal-req">Đang tải yêu cầu...</div>
-                    </div>
+                    <div class="ex-heading" id="modal-req-title">Yêu cầu (1)</div>
+                    <div class="ex-req-text" id="modal-req">Đang truy xuất dữ liệu từ SQL...</div>
 
-                    <div class="exercise-detail-section">
-                        <h3>🤖 Tiêu chí chấm (AI)</h3>
-                        <div style="background: #e8f5e9; border: 1px solid #c8e6c9; padding: 15px; border-radius: 8px; color: #2e7d32; font-size: 14px;">
-                            • Giải thuật đúng (3.0đ)<br>
-                            • Độ phức tạp tối ưu (3.0đ)<br>
-                            • Coding style chuẩn & Comment rõ ràng (4.0đ)
-                        </div>
-                    </div>
+                    <div class="ex-heading" id="modal-criteria-title">Tiêu chí chấm (4)</div>
+                    <ul class="criteria-list" id="modal-criteria">
+                        <li>Đang tải dữ liệu...</li>
+                    </ul>
 
-                    <p style="color: var(--primary); font-weight: bold; margin-bottom: 8px;">Dán bài làm của bạn (Code):</p>
-                    <textarea id="work-submission" placeholder="// Viết code giải bài toán tại đây..."></textarea>
+                    <textarea id="work-submission" placeholder="// Dán code C++, Java hoặc Python của bạn vào đây..."></textarea>
                 </div>
                 
                 <div id="grading-result-view" class="hidden submission-loading">
                     <div id="ai-grading-spinner">
-                        <h2 style="color: var(--ai-primary);">🤖 AI Đang Quét Code & Chấm Điểm...</h2>
-                        <div class="stat-value">Xin vui lòng chờ giây lát...</div>
+                        <h2 style="color: var(--ai-primary);">🤖 AI Đang Quét Code...</h2>
                     </div>
                     <div id="ai-grade-final" class="hidden stat-card" style="width: 400px; padding: 40px;">
                         <div style="color: #666; font-size: 16px; margin-bottom: 10px;">🤖 Kết quả AI chấm điểm:</div>
                         <div class="stat-value" id="ai-final-score" style="font-size: 36px; color: var(--primary);">0.0 Điểm</div>
                         <div style="margin-top: 15px;"><span class="tag-status" id="ai-passed-status" style="font-size: 14px; padding: 8px 15px;">CHỜ...</span></div>
-                        <div style="color: #666; font-size: 14px; margin-top: 20px; line-height: 1.5;" id="ai-grading-message">Đang tính toán gợi ý tiếp theo...</div>
                     </div>
                 </div>
             </div>
@@ -206,16 +177,12 @@
         let currentUserId = null;
         let currentSubject = 'CTDLGT'; 
         let currentExId = null; 
-        
-        // Biến lưu trữ toàn bộ bài tập gợi ý để lấy Mô tả, Yêu cầu đưa vào Khung Modal
-        let globalRecommendations = []; 
 
         async function handleLoginFlow() {
             const user = document.getElementById('txtUsername').value;
             const pass = document.getElementById('txtPassword').value;
             const btn = document.querySelector('.main-login-btn');
-            if(!user || !pass) { alert("Vui lòng nhập đủ thông tin!"); return; }
-            btn.innerHTML = "Đang kết nối Server..."; btn.disabled = true;
+            btn.innerHTML = "Đang kết nối..."; btn.disabled = true;
 
             try {
                 const response = await fetch(`${SERVER_URL}/api/login`, {
@@ -223,26 +190,20 @@
                     body: JSON.stringify({ username: user, password: pass })
                 });
                 const data = await response.json();
-                if(data.status === "error") { alert(data.message); btn.innerHTML = "Xác Nhận Đăng Nhập"; btn.disabled = false; return;}
+                if(data.status === "error") { alert(data.message); btn.innerHTML = "Đăng Nhập"; btn.disabled = false; return;}
                 
                 currentUserId = data.user_id;
                 document.getElementById('login-screen').classList.add('hidden');
-                
-                if(data.role === 'student') {
-                    document.getElementById('sv-fullname').innerText = data.full_name;
-                    document.getElementById('sv-id-info').innerText = `Mã SV: ${user} | Lớp: 22CT111`;
-                    document.getElementById('student-dashboard').classList.remove('hidden');
-                    loadAIRecommendations(); 
-                } else {
-                    document.getElementById('gv-fullname').innerText = "Giảng viên: " + data.full_name;
-                    document.getElementById('teacher-dashboard').classList.remove('hidden');
-                }
-            } catch (error) { alert("Lỗi kết nối Server! Vui lòng kiểm tra lại Render."); btn.innerHTML = "Xác Nhận Đăng Nhập"; btn.disabled = false; }
+                document.getElementById('sv-fullname').innerText = data.full_name;
+                document.getElementById('sv-id-info').innerText = `Mã SV: ${user} | Lớp: 22CT111`;
+                document.getElementById('student-dashboard').classList.remove('hidden');
+                loadAIRecommendations(); 
+            } catch (error) { alert("Lỗi kết nối!"); btn.innerHTML = "Đăng Nhập"; btn.disabled = false; }
         }
 
         async function loadAIRecommendations() {
             const aiContainer = document.getElementById('ai-recommendation-box');
-            aiContainer.innerHTML = `<h3 style="color: #2196F3;">🤖 AI Đang Quét Năng lực & Đề Xuất Bài Tập...</h3>`;
+            aiContainer.innerHTML = `<h3 style="color: #2196F3;">🤖 Đang tính toán gợi ý...</h3>`;
 
             try {
                 const response = await fetch(`${SERVER_URL}/api/recommend`, {
@@ -251,35 +212,27 @@
                 });
                 const data = await response.json();
 
-                // 1. CẬP NHẬT ĐIỂM & XẾP LOẠI (Bảo đảm hiện đúng như bạn yêu cầu)
                 if(data.avg_score > 0) {
                     let rankColor = data.academic_rank == "Yếu" ? "var(--danger)" : (data.academic_rank == "Khá" || data.academic_rank == "Giỏi" ? "var(--success)" : "var(--warning)");
                     document.getElementById('ai-level-display').innerHTML = `
-                        <span style="font-size: 32px; color: var(--primary);">${data.avg_score} Điểm</span> <br>
-                        <span style="font-size: 16px; color: ${rankColor}; display: inline-block; margin-top: 5px; font-weight: bold; background: #f0f4f8; padding: 5px 10px; border-radius: 4px;">Xếp loại: ${data.academic_rank}</span>
+                        <span style="font-size: 32px; color: #333;">${data.avg_score} Điểm</span> <br>
+                        <span style="font-size: 16px; color: ${rankColor}; font-weight: bold; margin-top: 5px; display: inline-block;">Học lực: ${data.academic_rank}</span>
                     `;
-                } else {
-                    document.getElementById('ai-level-display').innerText = `Chưa có dữ liệu điểm`;
                 }
                 
                 const cfStatus = document.getElementById('ai-cf-status');
                 if(data.cf_error_message.includes("ACTIVE")) {
-                    cfStatus.innerHTML = "✅ Thuật toán lọc cộng tác (Item-Based CF) <br><span style='color: var(--success); font-size: 13px;'>Đang Phân Tích Dữ Liệu Lớp Học</span>"; 
-                } else {
-                    cfStatus.innerText = "❌ Đã TẮT (" + data.cf_error_message.substring(0, 30) + "...)"; cfStatus.style.color = "var(--danger)";
+                    cfStatus.innerHTML = "✅ Đang HOẠT ĐỘNG (Item-Based CF)"; cfStatus.style.color = "var(--success)";
                 }
 
                 if(data.recommendations && data.recommendations.length > 0) {
-                    // Lưu vào biến global để truyền sang Modal
-                    globalRecommendations = data.recommendations;
-                    
-                    let htmlList = `<h3 style="color: #333; margin-bottom: 20px;">🤖 Lộ Trình Gợi Ý Tự Động Từ AI</h3>`;
+                    let htmlList = `<h3 style="color: #333; margin-bottom: 20px;">🤖 Lộ Trình Gợi Ý Tự Động (Level: ${data.current_level})</h3>`;
                     data.recommendations.forEach(item => {
                         let levelName = item.Difficulty == 1 ? "Dễ" : (item.Difficulty == 2 ? "Trung Bình" : "Khó");
                         let levelTag = item.Difficulty == 1 ? "tag-success" : (item.Difficulty == 2 ? "tag-warning" : "tag-danger");
                         htmlList += `
-                            <div style="padding: 18px; background: #fff; border-radius: 8px; border-left: 5px solid #2196F3; margin-top: 15px; cursor:pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition:0.2s;" onmouseover="this.style.transform='translateX(5px)'" onmouseout="this.style.transform='translateX(0)'" onclick="openSubmissionModal(${item.ExerciseID})">
-                                <b style="font-size: 16px; color: #283593;">ID: ${item.ExerciseID} - ${item.Title}</b><br>
+                            <div style="padding: 18px; background: #fff; border-radius: 8px; border-left: 5px solid #2196F3; margin-top: 15px; cursor:pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05);" onclick="openSubmissionModal(${item.ExerciseID}, '${item.Title.replace("'", "\\'")}')">
+                                <b style="font-size: 16px; color: #333;">ID: ${item.ExerciseID} - ${item.Title}</b><br>
                                 <div style="margin-top: 10px;">
                                     <span style="color: #666; font-size: 14px; background: #f0f0f0; padding: 3px 8px; border-radius: 4px;">Chủ đề: ${item.Tags}</span> 
                                     <span class="tag-status ${levelTag}" style="margin-left: 10px;">Mức: ${levelName}</span>
@@ -288,45 +241,58 @@
                         `;
                     });
                     aiContainer.innerHTML = htmlList;
-                } else { aiContainer.innerHTML = `<h3>🤖 Bạn đã hoàn thành toàn bộ bài tập hiện có của môn này!</h3>`; }
-            } catch (error) { aiContainer.innerHTML = `<h3 style="color:red;">Lỗi kết nối bộ não AI!</h3>`; }
+                }
+            } catch (error) { aiContainer.innerHTML = `<h3>Lỗi kết nối AI!</h3>`; }
         }
 
         function changeSubject(subjectCode, element) {
             currentSubject = subjectCode;
-            const menuItems = document.getElementById('student-dashboard').querySelectorAll('.menu-item');
-            menuItems.forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
             element.classList.add('active');
             loadAIRecommendations();
         }
 
-        function openSubmissionModal(exId) {
+        async function openSubmissionModal(exId, title) {
             currentExId = exId;
-            
-            // Lấy thông tin bài tập từ biến global để hiển thị Mô tả & Yêu cầu
-            const exerciseInfo = globalRecommendations.find(ex => ex.ExerciseID === exId);
-            
-            if(exerciseInfo) {
-                document.getElementById('modal-exercise-title').innerText = `ID ${exId} - ${exerciseInfo.Title}`;
-                
-                // Đẩy Mô tả và Yêu cầu vào khung Modal
-                document.getElementById('modal-desc').innerHTML = exerciseInfo.Description.replace(/\n/g, '<br>');
-                document.getElementById('modal-req').innerHTML = exerciseInfo.Requirement.replace(/\n/g, '<br>');
-            }
-
+            document.getElementById('modal-exercise-title').innerText = title;
             document.getElementById('work-submission').value = ""; 
+            
+            // Hiện loading text tạm thời
+            document.getElementById('modal-desc').innerHTML = "Đang tải dữ liệu từ SQL...";
+            document.getElementById('modal-req').innerHTML = "Đang tải...";
+            document.getElementById('modal-criteria').innerHTML = "<li>Đang tải...</li>";
+
             document.getElementById('submission-form-view').classList.remove('hidden');
             document.getElementById('grading-result-view').classList.add('hidden');
             document.querySelector('.submit-btn').classList.remove('hidden'); 
             document.getElementById('modal-re-recommend-btn').classList.add('hidden'); 
             document.getElementById('submission-modal').classList.remove('hidden');
+
+            // GỌI API LẤY CHI TIẾT TỪ SQL
+            try {
+                const res = await fetch(`${SERVER_URL}/api/exercise-details/${exId}`);
+                const details = await res.json();
+                
+                document.getElementById('modal-desc').innerHTML = details.mota.replace(/\n/g, '<br>');
+                document.getElementById('modal-req').innerHTML = details.yeucau.replace(/\n/g, '<br>');
+                
+                document.getElementById('modal-req-title').innerText = `Yêu cầu`;
+                document.getElementById('modal-criteria-title').innerText = `Tiêu chí chấm (${details.criteria.length})`;
+
+                let criteriaHtml = "";
+                details.criteria.forEach(c => {
+                    criteriaHtml += `<li><b>${c.name}</b> <span class="criteria-score">(${c.score} điểm)</span></li>`;
+                });
+                document.getElementById('modal-criteria').innerHTML = criteriaHtml;
+
+            } catch (err) {
+                document.getElementById('modal-desc').innerHTML = "Lỗi truy xuất CSDL.";
+            }
         }
 
         function closeSubmissionModal() {
             document.getElementById('submission-modal').classList.add('hidden');
-            if(!document.getElementById('modal-re-recommend-btn').classList.contains('hidden')) {
-                loadAIRecommendations();
-            }
+            if(!document.getElementById('modal-re-recommend-btn').classList.contains('hidden')) { loadAIRecommendations(); }
         }
 
         async function submitWorkToMockAI() {
@@ -345,29 +311,22 @@
                     body: JSON.stringify({ student_id: currentUserId, exercise_id: currentExId, submitted_work: code })
                 });
                 const data = await response.json();
-
                 await new Promise(r => setTimeout(r, 1500));
 
                 document.getElementById('ai-grading-spinner').classList.add('hidden');
                 document.getElementById('ai-grade-final').classList.remove('hidden');
                 document.getElementById('ai-final-score').innerText = `${data.score} Điểm`;
-                document.getElementById('ai-grading-message').innerText = data.message;
                 
                 const passedStatus = document.getElementById('ai-passed-status');
                 if(data.passed) {
-                    passedStatus.innerText = "✅ ĐÃ VƯỢT QUA BÀI TẬP"; passedStatus.className = "tag-status tag-success";
+                    passedStatus.innerText = "✅ ĐÃ VƯỢT QUA"; passedStatus.className = "tag-status tag-success";
                 } else {
-                    passedStatus.innerText = "❌ CHƯA ĐẠT YÊU CẦU"; passedStatus.className = "tag-status tag-danger";
+                    passedStatus.innerText = "❌ CHƯA ĐẠT"; passedStatus.className = "tag-status tag-danger";
                 }
-
                 document.getElementById('modal-re-recommend-btn').classList.remove('hidden');
 
-            } catch (error) {
-                alert("Lỗi kết nối Server chấm điểm!");
-                closeSubmissionModal();
-            }
+            } catch (error) { alert("Lỗi chấm điểm!"); closeSubmissionModal(); }
         }
-
         function logout() { location.reload(); }
     </script>
 </body>
