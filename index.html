@@ -149,15 +149,14 @@
                 </div>
             </div>
             
-            <div style="background: #fff3f3; border-left: 6px solid var(--danger); padding: 15px; border-radius: 8px; margin-bottom: 25px;">
-                ⚠️ AI Cảnh báo: Có 5 sinh viên đang bị hổng kiến thức căn bản!
+            <div id="teacher-warning-box" class="hidden" style="background: #fff3f3; border-left: 6px solid var(--danger); padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+                <span id="teacher-warning-text">⚠️ Đang tải dữ liệu cảnh báo...</span>
             </div>
             
-            <div style="background: #fff; padding: 25px; border-radius: 10px; box-shadow: var(--card-shadow); border-top: 4px solid var(--primary);">
-                <h3 style="margin-top:0; color:var(--primary);">Quản lý lớp: 22CT111 - Cấu trúc dữ liệu & Giải thuật</h3>
-                <p style="color: #555;">Sĩ số: 40 sinh viên</p>
-                <p style="color: #555;">Trạng thái hệ thống gợi ý AI: <span style="color: var(--success); font-weight: bold;">Đang Hoạt Động (Hybrid Filtering)</span></p>
+            <div id="teacher-classes-container">
+                <h3 style="color: #2196F3;">Đang quét cơ sở dữ liệu để tải danh sách lớp học...</h3>
             </div>
+
         </div>
     </div>
 
@@ -226,17 +225,65 @@
                 currentUserId = data.user_id;
                 document.getElementById('login-screen').classList.add('hidden');
                 
-                // ĐÃ FIX LOGIC PHÂN QUYỀN Ở ĐÂY
                 if (data.role === 'student') {
                     document.getElementById('sv-fullname').innerText = data.full_name;
-                    document.getElementById('sv-id-info').innerText = `Mã SV: ${user} | Lớp: 22CT111`;
+                    document.getElementById('sv-id-info').innerText = `Mã SV: ${user}`;
                     document.getElementById('student-dashboard').classList.remove('hidden');
                     loadAIRecommendations(); 
                 } else {
                     document.getElementById('gv-fullname').innerText = "👨‍🏫 Giảng viên: " + data.full_name;
                     document.getElementById('teacher-dashboard').classList.remove('hidden');
+                    // GỌI HÀM TẢI DỮ LIỆU LỚP HỌC CHO GIẢNG VIÊN
+                    loadTeacherDashboard();
                 }
             } catch (error) { alert("Lỗi kết nối!"); btn.innerHTML = "Đăng Nhập"; btn.disabled = false; }
+        }
+
+        // ==========================================
+        // JS MỚI: TẢI DỮ LIỆU BẢNG ĐIỀU KHIỂN GIẢNG VIÊN
+        // ==========================================
+        async function loadTeacherDashboard() {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/teacher/overview`, {
+                    method: 'GET', headers: { 'Content-Type': 'application/json', 'x-user-role': 'teacher' }
+                });
+                const data = await response.json();
+
+                // 1. Xử lý Cảnh báo Sinh viên Yếu
+                const warningBox = document.getElementById('teacher-warning-box');
+                const warningText = document.getElementById('teacher-warning-text');
+                if (data.weak_students_count > 0) {
+                    warningText.innerHTML = `⚠️ <b>AI Cảnh báo:</b> Phát hiện <b style="color:red; font-size:18px;">${data.weak_students_count}</b> sinh viên đang có kết quả học tập dưới mức Trung Bình. Hệ thống đã tự động điều chỉnh lộ trình gợi ý sang các bài tập cơ bản để bồi dưỡng.`;
+                    warningBox.classList.remove('hidden');
+                } else {
+                    warningBox.classList.add('hidden');
+                }
+
+                // 2. Render Danh sách các lớp (22CT111 -> 22CT114)
+                const classContainer = document.getElementById('teacher-classes-container');
+                let classHtml = '';
+                
+                if(data.classes && data.classes.length > 0) {
+                    // Sắp xếp tên lớp theo thứ tự A-Z
+                    data.classes.sort((a,b) => a.class_name.localeCompare(b.class_name));
+                    
+                    data.classes.forEach(cls => {
+                        classHtml += `
+                        <div style="background: #fff; padding: 25px; border-radius: 10px; box-shadow: var(--card-shadow); border-top: 4px solid var(--primary); margin-bottom: 20px;">
+                            <h3 style="margin-top:0; color:var(--primary);">Quản lý lớp: ${cls.class_name} - Cấu trúc dữ liệu & Giải thuật</h3>
+                            <p style="color: #555; font-size: 16px;">👥 Sĩ số: <b>${cls.student_count} sinh viên</b></p>
+                            <p style="color: #555;">Trạng thái AI Gợi ý: <span style="color: var(--success); font-weight: bold;">Đang Hoạt Động (Hybrid Filtering Model)</span></p>
+                        </div>
+                        `;
+                    });
+                } else {
+                    classHtml = `<p>Chưa có dữ liệu lớp học.</p>`;
+                }
+                classContainer.innerHTML = classHtml;
+
+            } catch(e) {
+                document.getElementById('teacher-classes-container').innerHTML = `<h3 style="color:red;">Lỗi tải dữ liệu lớp học!</h3>`;
+            }
         }
 
         async function loadAIRecommendations() {
