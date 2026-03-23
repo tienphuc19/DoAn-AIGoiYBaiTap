@@ -27,13 +27,16 @@ def get_db_connection():
 def load_data_from_sql():
     try:
         conn = get_db_connection()
+        # Đã thêm MoTa và YeuCau vào câu lệnh SQL
         query_exercises = """
             SELECT 
                 Id AS ExerciseID, 
                 TenBaiTap AS Title, 
                 ISNULL(MaMon, '') AS SubjectCode,
                 ISNULL(MaMon, '') + ' ' + ISNULL(TenBaiTap, '') AS Tags,
-                ISNULL(MaDoKho, 1) AS Difficulty
+                ISNULL(MaDoKho, 1) AS Difficulty,
+                ISNULL(MoTa, N'Chưa có mô tả chi tiết từ cơ sở dữ liệu.') AS Description,
+                ISNULL(YeuCau, N'Chưa có yêu cầu cụ thể.') AS Requirement
             FROM BAITAP
         """
         df_exercises = pd.read_sql(query_exercises, conn)
@@ -68,11 +71,7 @@ def mock_grade_and_submit_result(request: MockGradeRequest, x_user_role: str = H
         if not check_ex:
             raise HTTPException(status_code=400, detail="Bài tập không tồn tại!")
             
-        if request.student_id == 333:
-            final_grade = random.uniform(7.5, 10.0) 
-        else:
-            final_grade = random.uniform(4.0, 9.0) 
-            
+        final_grade = random.uniform(5.5, 9.5) 
         final_grade = round(final_grade, 1) 
         
         query_upsert = text("""
@@ -89,7 +88,7 @@ def mock_grade_and_submit_result(request: MockGradeRequest, x_user_role: str = H
             "status": "success", 
             "score": final_grade,
             "passed": final_grade >= 5.0,
-            "message": f"🤖 AI Chấm Điểm dựa trên tiêu chí: Bạn đạt {final_grade} điểm và đã { 'vượt qua' if final_grade >= 5.0 else 'chưa vượt qua' } bài tập này. Điểm đã được lưu thành công!"
+            "message": f"🤖 AI Chấm Điểm dựa trên tiêu chí: Bạn đạt {final_grade} điểm. Điểm đã được lưu thành công!"
         }
     except HTTPException as e: raise e
     except Exception as e:
@@ -112,7 +111,6 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
         df_exercises = df_exercises[df_exercises['SubjectCode'].str.contains(request.subject_code, case=False, na=False)]
         df_exercises = df_exercises.reset_index(drop=True)
     
-    # --- TÍNH TOÁN ĐIỂM TRUNG BÌNH & XẾP LOẠI HỌC LỰC ---
     student_history = df_history[df_history['StudentID'] == request.student_id]
     if not student_history.empty:
         avg_score = round(student_history['Score'].mean(), 1)
@@ -127,14 +125,13 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
     else:
         avg_score = 0.0
         academic_rank = "Chưa có bài tập"
-    # ----------------------------------------------------
 
     if df_exercises.empty:
         return {"status": "success", "cf_error_message": "Không có bài tập.", "avg_score": avg_score, "academic_rank": academic_rank, "recommendations": []}
 
     all_attempts_ids = student_history['ExerciseID'].tolist()
-    
     passed_exercises_ids = student_history[student_history['Score'] >= 5.0]['ExerciseID'].tolist()
+    
     if not passed_exercises_ids:
         current_level = 1
     else:
