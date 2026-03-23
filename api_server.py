@@ -110,15 +110,31 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
     
     if request.subject_code:
         df_exercises = df_exercises[df_exercises['SubjectCode'].str.contains(request.subject_code, case=False, na=False)]
-        # DÒNG CODE "CỨU TINH" NẰM Ở ĐÂY: Reset lại số thứ tự để không bị lệch Index
         df_exercises = df_exercises.reset_index(drop=True)
     
-    if df_exercises.empty:
-        return {"status": "success", "cf_error_message": "Không có bài tập.", "recommendations": []}
+    # --- TÍNH TOÁN ĐIỂM TRUNG BÌNH & XẾP LOẠI HỌC LỰC ---
+    student_history = df_history[df_history['StudentID'] == request.student_id]
+    if not student_history.empty:
+        avg_score = round(student_history['Score'].mean(), 1)
+        if avg_score >= 8.0:
+            academic_rank = "Giỏi"
+        elif avg_score >= 6.5:
+            academic_rank = "Khá"
+        elif avg_score >= 5.0:
+            academic_rank = "Trung Bình"
+        else:
+            academic_rank = "Yếu"
+    else:
+        avg_score = 0.0
+        academic_rank = "Chưa có bài tập"
+    # ----------------------------------------------------
 
-    all_attempts_ids = df_history[df_history['StudentID'] == request.student_id]['ExerciseID'].tolist()
+    if df_exercises.empty:
+        return {"status": "success", "cf_error_message": "Không có bài tập.", "avg_score": avg_score, "academic_rank": academic_rank, "recommendations": []}
+
+    all_attempts_ids = student_history['ExerciseID'].tolist()
     
-    passed_exercises_ids = df_history[(df_history['StudentID'] == request.student_id) & (df_history['Score'] >= 5.0)]['ExerciseID'].tolist()
+    passed_exercises_ids = student_history[student_history['Score'] >= 5.0]['ExerciseID'].tolist()
     if not passed_exercises_ids:
         current_level = 1
     else:
@@ -128,7 +144,7 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
     candidate_exercises = df_exercises[(~df_exercises['ExerciseID'].isin(all_attempts_ids)) & (df_exercises['Difficulty'] <= current_level + 2)]
     
     if candidate_exercises.empty:
-        return {"status": "success", "cf_error_message": "Đã làm hết bài.", "recommendations": []}
+        return {"status": "success", "cf_error_message": "Đã làm hết bài.", "avg_score": avg_score, "academic_rank": academic_rank, "recommendations": []}
 
     tfidf = TfidfVectorizer()
     tfidf_matrix = tfidf.fit_transform(df_exercises['Tags'])
@@ -145,14 +161,11 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
     def calculate_cf_item_based_fallback():
         try:
             df_pivot = df_history.pivot_table(index='StudentID', columns='ExerciseID', values='Score')
-            
             if df_pivot.shape[0] < 2:
                 raise Exception("Lỗi: Ít hơn 2 sinh viên có dữ liệu, Collaborative Filtering Item-Based không thể hoạt động.")
-
             item_sim = cosine_similarity(df_pivot.T.fillna(0))
             item_sim_df = pd.DataFrame(item_sim, index=df_pivot.columns, columns=df_pivot.columns)
             
-            # Lấy lịch sử điểm của sinh viên hiện tại, nếu chưa có lịch sử gì thì bỏ qua
             if request.student_id not in df_pivot.index:
                 raise Exception("Sinh viên chưa có lịch sử làm bài để chạy Item-Based CF.")
                 
@@ -163,7 +176,6 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
                 if ex_id in passed_exercises_ids:
                     cf_scores_list.append(0) 
                     continue
-                
                 if ex_id in item_sim_df.columns:
                     sim_subset = item_sim_df[ex_id].reindex(student_scores.index).fillna(0)
                     weighted_sum = (sim_subset * student_scores).sum()
@@ -176,15 +188,11 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
             if len(cf_scores_list) > 0 and max(cf_scores_list) > min(cf_scores_list):
                 cf_scores_list = [(x - min(cf_scores_list)) / (max(cf_scores_list) - min(cf_scores_list)) for x in cf_scores_list]
             return cf_scores_list, False 
-
         except Exception as e:
-            print(f"[{e}] -> Gợi ý hỗn hợp đã FALLBACK sang Content-Based.")
             return None, e
 
     scores_cf, cf_error_msg = calculate_cf_item_based_fallback()
-
     final_recommendations_with_score = []
-    
     cb_scores_dict = {}
     if passed_indices:
         for idx in df_exercises.index:
@@ -198,7 +206,6 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
     for _, row in candidate_exercises.iterrows():
         ex_id = row['ExerciseID']
         cb_score = cb_scores_dict.get(ex_id, 0)
-        
         if scores_cf is not None:
             cf_score = cf_scores_dict.get(ex_id, 0)
             final_score = 0.6 * cb_score + 0.4 * cf_score
@@ -213,12 +220,13 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
 
     sorted_recommendations = sorted(final_recommendations_with_score, key=lambda x: x['final_hybrid_score'], reverse=True)
     top_k_recommendations = sorted_recommendations[:request.top_k]
-    
     result_list = [item['exercise'] for item in top_k_recommendations]
 
     return {
         "status": "success", 
         "current_level": int(current_level),
+        "avg_score": float(avg_score),
+        "academic_rank": academic_rank,
         "cf_error_message": str(cf_error_msg) if cf_error_msg else "Item-Based Collaborative Filtering is ACTIVE.",
         "recommendations": result_list
     }
