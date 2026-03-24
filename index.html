@@ -50,7 +50,7 @@
         .tag-warning { background: #fff3e0; color: var(--warning); border: 1px solid #ffe0b2;}
         .tag-success { background: #e8f5e9; color: var(--success); border: 1px solid #c8e6c9;}
 
-        /* CSS MỚI CHO BẢNG ĐIỂM GIẢNG VIÊN */
+        /* CSS BẢNG ĐIỂM DÙNG CHUNG (CẢ GIẢNG VIÊN VÀ SINH VIÊN) */
         .class-card-clickable { background: #fff; padding: 25px; border-radius: 10px; box-shadow: var(--card-shadow); border-top: 4px solid var(--primary); margin-bottom: 20px; cursor: pointer; transition: 0.2s;}
         .class-card-clickable:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); border-top-color: var(--ai-primary);}
         
@@ -59,11 +59,8 @@
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
         th { background-color: #f8f9fa; color: var(--primary); font-weight: bold; }
         tr:hover { background-color: #f5f5f5; }
-        
-        /* Bôi đỏ sinh viên yếu */
         .weak-student-row { background-color: #ffebee !important; }
         .weak-student-row td { color: var(--danger); font-weight: bold;}
-        
         .back-btn { background: #e0e0e0; color: #333; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-bottom: 20px; transition: 0.2s; font-size: 15px;}
         .back-btn:hover { background: #ccc; }
 
@@ -110,11 +107,14 @@
     <div id="student-dashboard" class="dashboard hidden">
         <div class="sidebar">
             <div class="sidebar-header">🤖 Hệ Thống Gợi Ý</div>
-            <ul class="menu-list">
+            <ul class="menu-list" id="student-menu-list">
                 <li class="menu-item active" onclick="changeSubject('CTDLGT', this)">📚 Cấu trúc dữ liệu & Giải thuật</li>
                 <li class="menu-item" onclick="changeSubject('KTLT', this)">📚 Kỹ thuật lập trình</li>
                 <li class="menu-item" onclick="changeSubject('OOP', this)">📚 Lập trình hướng đối tượng</li>
                 <li class="menu-item" onclick="changeSubject('NMLT', this)">📚 Nhập môn lập trình</li>
+                
+                <hr style="border: 0; border-top: 1px solid #ddd; margin: 15px 25px;">
+                <li class="menu-item" onclick="showStudentHistory(this)">🕒 Lịch sử làm bài</li>
             </ul>
             <div class="logout-btn-container"><button class="logout-btn" onclick="logout()">🚪 Đăng Xuất</button></div>
         </div>
@@ -129,18 +129,43 @@
                 </div>
             </div>
             
-            <div class="grid-stats">
-                <div class="stat-card level">
-                    <div style="color: #666; font-size: 14px; font-weight: bold;">🎓 BÁO CÁO HỌC LỰC</div>
-                    <div class="stat-value" id="ai-level-display" style="margin-top: 15px; line-height: 1.4;">Đang tải...</div>
+            <div id="student-recommendation-view">
+                <div class="grid-stats">
+                    <div class="stat-card level">
+                        <div style="color: #666; font-size: 14px; font-weight: bold;">🎓 BÁO CÁO HỌC LỰC</div>
+                        <div class="stat-value" id="ai-level-display" style="margin-top: 15px; line-height: 1.4;">Đang tải...</div>
+                    </div>
+                    <div class="stat-card" style="border-top-color: var(--ai-primary);">
+                        <div style="color: #666; font-size: 14px; font-weight: bold;">📊 HỆ THỐNG GỢI Ý (AI CF)</div>
+                        <div style="font-size: 15px; font-weight: bold; margin-top: 15px;" id="ai-cf-status">Đang tải...</div>
+                    </div>
                 </div>
-                <div class="stat-card" style="border-top-color: var(--ai-primary);">
-                    <div style="color: #666; font-size: 14px; font-weight: bold;">📊 HỆ THỐNG GỢI Ý (AI CF)</div>
-                    <div style="font-size: 15px; font-weight: bold; margin-top: 15px;" id="ai-cf-status">Đang tải...</div>
+
+                <div class="ai-widget-container" id="ai-recommendation-box"></div>
+            </div>
+
+            <div id="student-history-view" class="hidden">
+                <div class="table-container">
+                    <div style="padding: 20px; border-bottom: 2px solid var(--primary); background: #f8f9fa;">
+                        <h3 style="margin: 0; color: var(--primary);">🕒 Lịch sử các bài tập đã hoàn thành</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Tên Bài Tập</th>
+                                <th>Môn Học</th>
+                                <th>Mức Độ</th>
+                                <th>Điểm Số</th>
+                                <th>Trạng Thái</th>
+                            </tr>
+                        </thead>
+                        <tbody id="student-history-list-body">
+                            </tbody>
+                    </table>
                 </div>
             </div>
 
-            <div class="ai-widget-container" id="ai-recommendation-box"></div>
         </div>
     </div>
 
@@ -176,7 +201,6 @@
 
             <div id="teacher-detail-view" class="hidden">
                 <button class="back-btn" onclick="backToTeacherOverview()">⬅ Quay lại danh sách lớp</button>
-                
                 <div class="table-container">
                     <div style="padding: 20px; border-bottom: 2px solid var(--primary); background: #f8f9fa;">
                         <h3 style="margin: 0; color: var(--primary);" id="detail-class-title">Danh sách sinh viên lớp...</h3>
@@ -190,8 +214,7 @@
                                 <th>Đánh Giá Của AI</th>
                             </tr>
                         </thead>
-                        <tbody id="detail-student-list">
-                            </tbody>
+                        <tbody id="detail-student-list"></tbody>
                     </table>
                 </div>
             </div>
@@ -237,8 +260,6 @@
         let currentUserId = null;
         let currentSubject = 'CTDLGT'; 
         let currentExId = null; 
-        
-        // Biến lưu trữ dữ liệu lớp học để không phải gọi API nhiều lần
         let globalClassesData = [];
 
         async function handleLoginFlow() {
@@ -272,93 +293,66 @@
         }
 
         // ==========================================
-        // JS QUẢN LÝ GIẢNG VIÊN VÀ BẢNG ĐIỂM
+        // JS QUẢN LÝ LỊCH SỬ SINH VIÊN MỚI THÊM
         // ==========================================
-        async function loadTeacherDashboard() {
+        async function showStudentHistory(element) {
+            // Cập nhật nút Menu
+            document.querySelectorAll('#student-menu-list .menu-item').forEach(item => item.classList.remove('active'));
+            element.classList.add('active');
+            
+            // Ẩn khung Gợi ý, Hiện khung Lịch sử
+            document.getElementById('student-recommendation-view').classList.add('hidden');
+            document.getElementById('student-history-view').classList.remove('hidden');
+            
+            const tbody = document.getElementById('student-history-list-body');
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 30px; font-weight: bold; color: var(--primary);">🤖 Đang tải dữ liệu từ cơ sở dữ liệu...</td></tr>`;
+            
             try {
-                const response = await fetch(`${SERVER_URL}/api/teacher/overview`, {
-                    method: 'GET', headers: { 'Content-Type': 'application/json', 'x-user-role': 'teacher' }
+                const response = await fetch(`${SERVER_URL}/api/history/${currentUserId}`, {
+                    headers: { 'x-user-role': 'student' }
                 });
                 const data = await response.json();
-                globalClassesData = data.classes; // Lưu vào biến toàn cục
-
-                const warningBox = document.getElementById('teacher-warning-box');
-                const warningText = document.getElementById('teacher-warning-text');
-                if (data.weak_students_count > 0) {
-                    warningText.innerHTML = `⚠️ <b>AI Cảnh báo:</b> Phát hiện <b style="color:red; font-size:18px;">${data.weak_students_count}</b> sinh viên đang có kết quả học tập dưới mức Trung Bình. Hệ thống đã bôi đỏ để giảng viên theo dõi.`;
-                    warningBox.classList.remove('hidden');
-                } else {
-                    warningBox.classList.add('hidden');
-                }
-
-                const classContainer = document.getElementById('teacher-classes-container');
-                let classHtml = '';
                 
-                if(globalClassesData && globalClassesData.length > 0) {
-                    globalClassesData.sort((a,b) => a.class_name.localeCompare(b.class_name));
-                    
-                    globalClassesData.forEach(cls => {
-                        // Thêm sự kiện onclick vào từng thẻ lớp học
-                        classHtml += `
-                        <div class="class-card-clickable" onclick="showClassDetails('${cls.class_name}')">
-                            <h3 style="margin-top:0; color:var(--primary);">Quản lý lớp: ${cls.class_name} - Cấu trúc dữ liệu & Giải thuật</h3>
-                            <p style="color: #555; font-size: 16px;">👥 Sĩ số: <b>${cls.student_count} sinh viên</b> <span style="font-size: 13px; color: #888; margin-left: 10px;">(Nhấp vào để xem chi tiết điểm số)</span></p>
-                            <p style="color: #555;">Trạng thái AI Gợi ý: <span style="color: var(--success); font-weight: bold;">Đang Hoạt Động (Hybrid Filtering Model)</span></p>
-                        </div>
+                if(data.history && data.history.length > 0) {
+                    let html = '';
+                    data.history.forEach(item => {
+                        let levelName = item.Difficulty == 1 ? "Dễ" : (item.Difficulty == 2 ? "Trung Bình" : "Khó");
+                        let status = item.Score >= 5.0 ? `<span style="color:var(--success); font-weight:bold;">✅ Đạt</span>` : `<span style="color:var(--danger); font-weight:bold;">❌ Chưa Đạt</span>`;
+                        
+                        html += `
+                            <tr>
+                                <td><b>${item.ExerciseID}</b></td>
+                                <td style="color: var(--primary); font-weight: 500;">${item.Title}</td>
+                                <td>${item.SubjectCode}</td>
+                                <td>${levelName}</td>
+                                <td><b style="font-size: 16px;">${item.Score}</b></td>
+                                <td>${status}</td>
+                            </tr>
                         `;
                     });
+                    tbody.innerHTML = html;
                 } else {
-                    classHtml = `<p>Chưa có dữ liệu lớp học.</p>`;
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 30px; color: #666;">Bạn chưa hoàn thành bài tập nào. Hãy ra mục Gợi ý để làm bài nhé!</td></tr>`;
                 }
-                classContainer.innerHTML = classHtml;
-
             } catch(e) {
-                document.getElementById('teacher-classes-container').innerHTML = `<h3 style="color:red;">Lỗi tải dữ liệu lớp học!</h3>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red; padding: 30px;">Lỗi kết nối cơ sở dữ liệu.</td></tr>`;
             }
         }
 
-        function showClassDetails(className) {
-            // Ẩn tổng quan, Hiện chi tiết
-            document.getElementById('teacher-overview-view').classList.add('hidden');
-            document.getElementById('teacher-detail-view').classList.remove('hidden');
+        // Đã cập nhật hàm này để khi bấm qua môn học khác, màn hình Lịch sử sẽ tự ẩn đi
+        function changeSubject(subjectCode, element) {
+            currentSubject = subjectCode;
+            document.querySelectorAll('#student-menu-list .menu-item').forEach(item => item.classList.remove('active'));
+            element.classList.add('active');
             
-            document.getElementById('detail-class-title').innerText = `Danh sách sinh viên - Lớp ${className}`;
+            document.getElementById('student-recommendation-view').classList.remove('hidden');
+            document.getElementById('student-history-view').classList.add('hidden');
             
-            const clsData = globalClassesData.find(c => c.class_name === className);
-            let tbody = '';
-            
-            if(clsData && clsData.students) {
-                // Sắp xếp sinh viên yếu lên trên cùng để giảng viên dễ thấy
-                clsData.students.sort((a,b) => a.avg_score - b.avg_score);
-                
-                clsData.students.forEach(sv => {
-                    // Logic bôi đỏ: Điểm dưới 5 và lớn hơn 0 (Đã làm bài)
-                    let isWeak = sv.avg_score < 5.0 && sv.avg_score > 0;
-                    let noData = sv.avg_score === 0;
-                    
-                    let rowClass = isWeak ? 'weak-student-row' : '';
-                    let status = isWeak ? '⚠️ Yếu (Cần phụ đạo)' : (noData ? 'Chưa làm bài' : '✅ Đạt');
-                    
-                    tbody += `
-                        <tr class="${rowClass}">
-                            <td><b>${sv.username}</b></td>
-                            <td>${sv.fullname}</td>
-                            <td>${noData ? '-' : sv.avg_score}</td>
-                            <td>${status}</td>
-                        </tr>
-                    `;
-                });
-            }
-            document.getElementById('detail-student-list').innerHTML = tbody;
-        }
-
-        function backToTeacherOverview() {
-            document.getElementById('teacher-detail-view').classList.add('hidden');
-            document.getElementById('teacher-overview-view').classList.remove('hidden');
+            loadAIRecommendations();
         }
 
         // ==========================================
-        // JS DÀNH CHO SINH VIÊN (GIỮ NGUYÊN)
+        // JS QUẢN LÝ GỢI Ý & CHẤM ĐIỂM (GIỮ NGUYÊN)
         // ==========================================
         async function loadAIRecommendations() {
             const aiContainer = document.getElementById('ai-recommendation-box');
@@ -400,22 +394,13 @@
             } catch (error) { aiContainer.innerHTML = `<h3>Lỗi kết nối AI!</h3>`; }
         }
 
-        function changeSubject(subjectCode, element) {
-            currentSubject = subjectCode;
-            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
-            element.classList.add('active');
-            loadAIRecommendations();
-        }
-
         async function openSubmissionModal(exId, title) {
             currentExId = exId;
             document.getElementById('modal-exercise-title').innerText = title;
             document.getElementById('work-submission').value = ""; 
-            
             document.getElementById('modal-desc').innerHTML = "Đang tải dữ liệu từ SQL...";
             document.getElementById('modal-req').innerHTML = "Đang tải...";
             document.getElementById('modal-criteria').innerHTML = "<li>Đang tải...</li>";
-
             document.getElementById('submission-form-view').classList.remove('hidden');
             document.getElementById('grading-result-view').classList.add('hidden');
             document.querySelector('.submit-btn').classList.remove('hidden'); 
@@ -443,7 +428,6 @@
         async function submitWorkToMockAI() {
             const code = document.getElementById('work-submission').value;
             if(!code) { alert("Vui lòng dán code của bạn!"); return; }
-
             document.getElementById('submission-form-view').classList.add('hidden');
             document.getElementById('grading-result-view').classList.remove('hidden');
             document.getElementById('ai-grading-spinner').classList.remove('hidden');
@@ -457,7 +441,6 @@
                 });
                 const data = await response.json();
                 await new Promise(r => setTimeout(r, 1500));
-
                 document.getElementById('ai-grading-spinner').classList.add('hidden');
                 document.getElementById('ai-grade-final').classList.remove('hidden');
                 document.getElementById('ai-final-score').innerText = `${data.score} Điểm`;
@@ -470,6 +453,64 @@
                 document.getElementById('modal-re-recommend-btn').classList.remove('hidden');
             } catch (error) { alert("Lỗi chấm điểm!"); closeSubmissionModal(); }
         }
+
+        // ==========================================
+        // JS QUẢN LÝ GIẢNG VIÊN (GIỮ NGUYÊN)
+        // ==========================================
+        async function loadTeacherDashboard() {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/teacher/overview`, {
+                    method: 'GET', headers: { 'Content-Type': 'application/json', 'x-user-role': 'teacher' }
+                });
+                const data = await response.json();
+                globalClassesData = data.classes; 
+                const warningBox = document.getElementById('teacher-warning-box');
+                const warningText = document.getElementById('teacher-warning-text');
+                if (data.weak_students_count > 0) {
+                    warningText.innerHTML = `⚠️ <b>AI Cảnh báo:</b> Phát hiện <b style="color:red; font-size:18px;">${data.weak_students_count}</b> sinh viên đang có kết quả học tập dưới mức Trung Bình.`;
+                    warningBox.classList.remove('hidden');
+                } else { warningBox.classList.add('hidden'); }
+
+                const classContainer = document.getElementById('teacher-classes-container');
+                let classHtml = '';
+                if(globalClassesData && globalClassesData.length > 0) {
+                    globalClassesData.sort((a,b) => a.class_name.localeCompare(b.class_name));
+                    globalClassesData.forEach(cls => {
+                        classHtml += `
+                        <div class="class-card-clickable" onclick="showClassDetails('${cls.class_name}')">
+                            <h3 style="margin-top:0; color:var(--primary);">Quản lý lớp: ${cls.class_name} - Cấu trúc dữ liệu & Giải thuật</h3>
+                            <p style="color: #555; font-size: 16px;">👥 Sĩ số: <b>${cls.student_count} sinh viên</b> <span style="font-size: 13px; color: #888; margin-left: 10px;">(Nhấp vào xem chi tiết)</span></p>
+                        </div>`;
+                    });
+                } else { classHtml = `<p>Chưa có dữ liệu lớp học.</p>`; }
+                classContainer.innerHTML = classHtml;
+            } catch(e) { document.getElementById('teacher-classes-container').innerHTML = `<h3 style="color:red;">Lỗi tải dữ liệu.</h3>`; }
+        }
+
+        function showClassDetails(className) {
+            document.getElementById('teacher-overview-view').classList.add('hidden');
+            document.getElementById('teacher-detail-view').classList.remove('hidden');
+            document.getElementById('detail-class-title').innerText = `Danh sách sinh viên - Lớp ${className}`;
+            const clsData = globalClassesData.find(c => c.class_name === className);
+            let tbody = '';
+            if(clsData && clsData.students) {
+                clsData.students.sort((a,b) => a.avg_score - b.avg_score);
+                clsData.students.forEach(sv => {
+                    let isWeak = sv.avg_score < 5.0 && sv.avg_score > 0;
+                    let noData = sv.avg_score === 0;
+                    let rowClass = isWeak ? 'weak-student-row' : '';
+                    let status = isWeak ? '⚠️ Yếu' : (noData ? 'Chưa làm bài' : '✅ Đạt');
+                    tbody += `<tr class="${rowClass}"><td><b>${sv.username}</b></td><td>${sv.fullname}</td><td>${noData ? '-' : sv.avg_score}</td><td>${status}</td></tr>`;
+                });
+            }
+            document.getElementById('detail-student-list').innerHTML = tbody;
+        }
+
+        function backToTeacherOverview() {
+            document.getElementById('teacher-detail-view').classList.add('hidden');
+            document.getElementById('teacher-overview-view').classList.remove('hidden');
+        }
+
         function logout() { location.reload(); }
     </script>
 </body>
