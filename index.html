@@ -161,7 +161,7 @@
                             </tr>
                         </thead>
                         <tbody id="student-history-list-body">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -210,8 +210,8 @@
                             <tr>
                                 <th>Mã SV</th>
                                 <th>Họ và Tên</th>
-                                <th>Điểm Trung Bình</th>
-                                <th>Đánh Giá Của AI</th>
+                                <th>Số Bài Dưới 5</th>
+                                <th>Trạng Thái</th>
                             </tr>
                         </thead>
                         <tbody id="detail-student-list"></tbody>
@@ -293,14 +293,12 @@
         }
 
         // ==========================================
-        // JS QUẢN LÝ LỊCH SỬ SINH VIÊN MỚI THÊM
+        // JS QUẢN LÝ LỊCH SỬ SINH VIÊN
         // ==========================================
         async function showStudentHistory(element) {
-            // Cập nhật nút Menu
             document.querySelectorAll('#student-menu-list .menu-item').forEach(item => item.classList.remove('active'));
             element.classList.add('active');
             
-            // Ẩn khung Gợi ý, Hiện khung Lịch sử
             document.getElementById('student-recommendation-view').classList.add('hidden');
             document.getElementById('student-history-view').classList.remove('hidden');
             
@@ -339,7 +337,6 @@
             }
         }
 
-        // Đã cập nhật hàm này để khi bấm qua môn học khác, màn hình Lịch sử sẽ tự ẩn đi
         function changeSubject(subjectCode, element) {
             currentSubject = subjectCode;
             document.querySelectorAll('#student-menu-list .menu-item').forEach(item => item.classList.remove('active'));
@@ -352,7 +349,7 @@
         }
 
         // ==========================================
-        // JS QUẢN LÝ GỢI Ý & CHẤM ĐIỂM (GIỮ NGUYÊN)
+        // JS QUẢN LÝ GỢI Ý & CHẤM ĐIỂM
         // ==========================================
         async function loadAIRecommendations() {
             const aiContainer = document.getElementById('ai-recommendation-box');
@@ -369,11 +366,17 @@
                         <span style="font-size: 32px; color: #333;">${data.avg_score} Điểm</span> <br>
                         <span style="font-size: 16px; color: ${rankColor}; font-weight: bold; margin-top: 5px; display: inline-block;">Học lực: ${data.academic_rank}</span>
                     `;
+                } else {
+                    document.getElementById('ai-level-display').innerHTML = `Chưa có điểm`;
                 }
+                
                 const cfStatus = document.getElementById('ai-cf-status');
                 if(data.cf_error_message.includes("ACTIVE")) {
                     cfStatus.innerHTML = "✅ Đang HOẠT ĐỘNG (Item-Based CF)"; cfStatus.style.color = "var(--success)";
+                } else {
+                    cfStatus.innerHTML = `Đã tắt`; cfStatus.style.color = "var(--danger)";
                 }
+
                 if(data.recommendations && data.recommendations.length > 0) {
                     let htmlList = `<h3 style="color: #333; margin-bottom: 20px;">🤖 Lộ Trình Gợi Ý Tự Động (Level: ${data.current_level})</h3>`;
                     data.recommendations.forEach(item => {
@@ -390,6 +393,8 @@
                         `;
                     });
                     aiContainer.innerHTML = htmlList;
+                } else {
+                    aiContainer.innerHTML = `<h3>🤖 Bạn đã làm hết bài tập cho môn này!</h3>`;
                 }
             } catch (error) { aiContainer.innerHTML = `<h3>Lỗi kết nối AI!</h3>`; }
         }
@@ -455,7 +460,7 @@
         }
 
         // ==========================================
-        // JS QUẢN LÝ GIẢNG VIÊN (GIỮ NGUYÊN)
+        // JS QUẢN LÝ GIẢNG VIÊN (ĐẾM BÀI < 5)
         // ==========================================
         async function loadTeacherDashboard() {
             try {
@@ -464,10 +469,11 @@
                 });
                 const data = await response.json();
                 globalClassesData = data.classes; 
+                
                 const warningBox = document.getElementById('teacher-warning-box');
                 const warningText = document.getElementById('teacher-warning-text');
                 if (data.weak_students_count > 0) {
-                    warningText.innerHTML = `⚠️ <b>AI Cảnh báo:</b> Phát hiện <b style="color:red; font-size:18px;">${data.weak_students_count}</b> sinh viên đang có kết quả học tập dưới mức Trung Bình.`;
+                    warningText.innerHTML = `⚠️ <b>AI Cảnh báo:</b> Phát hiện <b style="color:red; font-size:18px;">${data.weak_students_count}</b> sinh viên có bài tập bị dưới 5 điểm. Vui lòng kiểm tra chi tiết các lớp!`;
                     warningBox.classList.remove('hidden');
                 } else { warningBox.classList.add('hidden'); }
 
@@ -491,16 +497,26 @@
             document.getElementById('teacher-overview-view').classList.add('hidden');
             document.getElementById('teacher-detail-view').classList.remove('hidden');
             document.getElementById('detail-class-title').innerText = `Danh sách sinh viên - Lớp ${className}`;
+
             const clsData = globalClassesData.find(c => c.class_name === className);
             let tbody = '';
             if(clsData && clsData.students) {
-                clsData.students.sort((a,b) => a.avg_score - b.avg_score);
+                // Sắp xếp người rớt nhiều bài lên trên cùng
+                clsData.students.sort((a,b) => b.failed_count - a.failed_count);
+                
                 clsData.students.forEach(sv => {
-                    let isWeak = sv.avg_score < 5.0 && sv.avg_score > 0;
-                    let noData = sv.avg_score === 0;
+                    let isWeak = sv.failed_count > 0;
                     let rowClass = isWeak ? 'weak-student-row' : '';
-                    let status = isWeak ? '⚠️ Yếu' : (noData ? 'Chưa làm bài' : '✅ Đạt');
-                    tbody += `<tr class="${rowClass}"><td><b>${sv.username}</b></td><td>${sv.fullname}</td><td>${noData ? '-' : sv.avg_score}</td><td>${status}</td></tr>`;
+                    let status = isWeak ? `⚠️ Cần nhắc nhở` : `✅ Ổn định`;
+                    
+                    tbody += `
+                        <tr class="${rowClass}">
+                            <td><b>${sv.username}</b></td>
+                            <td>${sv.fullname}</td>
+                            <td style="color: ${isWeak ? 'red' : '#333'}; font-weight: bold;">${sv.failed_count} bài</td>
+                            <td>${status}</td>
+                        </tr>
+                    `;
                 });
             }
             document.getElementById('detail-student-list').innerHTML = tbody;
