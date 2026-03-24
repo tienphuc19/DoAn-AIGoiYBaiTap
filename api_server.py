@@ -28,25 +28,16 @@ def load_data_from_sql():
     try:
         conn = get_db_connection()
         query_exercises = """
-            SELECT 
-                Id AS ExerciseID, 
-                TenBaiTap AS Title, 
-                ISNULL(MaMon, '') AS SubjectCode,
-                ISNULL(MaMon, '') + ' ' + ISNULL(TenBaiTap, '') AS Tags,
-                ISNULL(MaDoKho, 1) AS Difficulty
+            SELECT Id AS ExerciseID, TenBaiTap AS Title, ISNULL(MaMon, '') AS SubjectCode,
+                   ISNULL(MaMon, '') + ' ' + ISNULL(TenBaiTap, '') AS Tags, ISNULL(MaDoKho, 1) AS Difficulty
             FROM BAITAP
         """
         df_exercises = pd.read_sql(query_exercises, conn)
-        
-        query_history = """
-            SELECT MaSinhVien AS StudentID, MaBaiTap AS ExerciseID, DiemSo AS Score 
-            FROM AI_LichSuLamBai
-        """
+        query_history = "SELECT MaSinhVien AS StudentID, MaBaiTap AS ExerciseID, DiemSo AS Score FROM AI_LichSuLamBai"
         df_history = pd.read_sql(query_history, conn)
         conn.close()
         return df_exercises, df_history
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi SQL: {str(e)}")
+    except Exception as e: raise HTTPException(status_code=500, detail=f"Lỗi SQL: {str(e)}")
 
 @app.get("/api/exercise-details/{ex_id}", tags=["Sinh Viên"])
 def get_exercise_details(ex_id: int):
@@ -63,18 +54,13 @@ def get_exercise_details(ex_id: int):
     try:
         df_bt = pd.read_sql(f"SELECT * FROM BAITAP WHERE Id = {ex_id}", conn)
         if not df_bt.empty:
-            if 'MoTa' in df_bt.columns and pd.notna(df_bt['MoTa'].iloc[0]) and str(df_bt['MoTa'].iloc[0]).strip() != "":
-                mota = str(df_bt['MoTa'].iloc[0])
-            if 'YeuCau' in df_bt.columns and pd.notna(df_bt['YeuCau'].iloc[0]) and str(df_bt['YeuCau'].iloc[0]).strip() != "":
-                yeucau = str(df_bt['YeuCau'].iloc[0])
+            if 'MoTa' in df_bt.columns and pd.notna(df_bt['MoTa'].iloc[0]) and str(df_bt['MoTa'].iloc[0]).strip() != "": mota = str(df_bt['MoTa'].iloc[0])
+            if 'YeuCau' in df_bt.columns and pd.notna(df_bt['YeuCau'].iloc[0]) and str(df_bt['YeuCau'].iloc[0]).strip() != "": yeucau = str(df_bt['YeuCau'].iloc[0])
 
         df_tc = pd.read_sql("SELECT * FROM TIEUCHI_DANGBAI", conn)
         df_tc_filtered = pd.DataFrame()
-        if 'MaBaiTap' in df_tc.columns:
-            df_tc_filtered = df_tc[df_tc['MaBaiTap'] == ex_id]
-        elif 'MaDangBai' in df_tc.columns and 'MaDangBai' in df_bt.columns:
-            madangbai = df_bt['MaDangBai'].iloc[0]
-            df_tc_filtered = df_tc[df_tc['MaDangBai'] == madangbai]
+        if 'MaBaiTap' in df_tc.columns: df_tc_filtered = df_tc[df_tc['MaBaiTap'] == ex_id]
+        elif 'MaDangBai' in df_tc.columns and 'MaDangBai' in df_bt.columns: df_tc_filtered = df_tc[df_tc['MaDangBai'] == df_bt['MaDangBai'].iloc[0]]
 
         if not df_tc_filtered.empty:
             criteria_list = []
@@ -84,15 +70,10 @@ def get_exercise_details(ex_id: int):
                 name = str(row[name_col]) if name_col else "Tiêu chí thành phần"
                 score = str(int(row[score_col])) if score_col and pd.notna(row[score_col]) else "0"
                 criteria_list.append({"name": name, "score": score})
-    except Exception as e:
-        print(f"Lỗi truy xuất SQL: {e}")
+    except Exception as e: print(f"Lỗi SQL: {e}")
 
     if len(criteria_list) == 0:
-        criteria_list = [
-            {"name": "Giải thuật chính xác, đáp ứng yêu cầu bài toán", "score": 40},
-            {"name": "Tối ưu hóa bộ nhớ và độ phức tạp thuật toán", "score": 30},
-            {"name": "Tuân thủ Coding convention và viết comment rõ ràng", "score": 30}
-        ]
+        criteria_list = [{"name": "Giải thuật chính xác, đáp ứng yêu cầu", "score": 40}, {"name": "Tối ưu độ phức tạp", "score": 30}, {"name": "Tuân thủ Coding convention", "score": 30}]
 
     conn.close()
     return {"status": "success", "mota": mota, "yeucau": yeucau, "criteria": criteria_list}
@@ -107,7 +88,8 @@ def mock_grade_and_submit_result(request: MockGradeRequest, x_user_role: str = H
     if x_user_role != "student": raise HTTPException(status_code=403, detail="Cấm truy cập!")
     try:
         conn = get_db_connection()
-        final_grade = round(random.uniform(6.5, 9.5), 1) 
+        # Đổi thành 3.0 -> 9.5 để sinh viên có thể bị dưới 5 khi test
+        final_grade = round(random.uniform(3.0, 9.5), 1) 
         query_upsert = text("""
             IF EXISTS (SELECT 1 FROM AI_LichSuLamBai WHERE MaSinhVien = :sv_id AND MaBaiTap = :ex_id)
                 UPDATE AI_LichSuLamBai SET DiemSo = :grade WHERE MaSinhVien = :sv_id AND MaBaiTap = :ex_id
@@ -130,18 +112,15 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
     if x_user_role != "student": raise HTTPException(status_code=403, detail="Cấm truy cập!")
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
-    
     if request.subject_code:
-        df_exercises = df_exercises[df_exercises['SubjectCode'].str.contains(request.subject_code, case=False, na=False)]
-        df_exercises = df_exercises.reset_index(drop=True)
+        df_exercises = df_exercises[df_exercises['SubjectCode'].str.contains(request.subject_code, case=False, na=False)].reset_index(drop=True)
     
     student_history = df_history[df_history['StudentID'] == request.student_id]
     if not student_history.empty:
         avg_score = round(student_history['Score'].mean(), 1)
         academic_rank = "Giỏi" if avg_score >= 8.0 else ("Khá" if avg_score >= 6.5 else ("Trung Bình" if avg_score >= 5.0 else "Yếu"))
     else:
-        avg_score = 0.0
-        academic_rank = "Chưa có bài tập"
+        avg_score = 0.0; academic_rank = "Chưa có bài tập"
 
     if df_exercises.empty: return {"status": "success", "cf_error_message": "Không có bài tập.", "avg_score": avg_score, "academic_rank": academic_rank, "recommendations": []}
 
@@ -190,47 +169,27 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
         final_recommendations_with_score.append({"exercise": row.to_dict(), "final_hybrid_score": float(final_score)})
 
     sorted_recommendations = sorted(final_recommendations_with_score, key=lambda x: x['final_hybrid_score'], reverse=True)
-    return {
-        "status": "success", "current_level": int(current_level), "avg_score": float(avg_score), "academic_rank": academic_rank,
-        "cf_error_message": str(cf_error_msg) if cf_error_msg else "Item-Based Collaborative Filtering is ACTIVE.",
-        "recommendations": [item['exercise'] for item in sorted_recommendations[:request.top_k]]
-    }
+    return {"status": "success", "current_level": int(current_level), "avg_score": float(avg_score), "academic_rank": academic_rank,
+            "cf_error_message": str(cf_error_msg) if cf_error_msg else "Item-Based Collaborative Filtering is ACTIVE.",
+            "recommendations": [item['exercise'] for item in sorted_recommendations[:request.top_k]]}
 
-# ==========================================
-# API MỚI: LẤY LỊCH SỬ BÀI LÀM CỦA SINH VIÊN
-# ==========================================
 @app.get("/api/history/{student_id}", tags=["Sinh Viên"])
 def get_student_history(student_id: int, x_user_role: str = Header(None, description="Bắt buộc nhập 'student'")):
     if x_user_role != "student": raise HTTPException(status_code=403, detail="Cấm truy cập!")
     try:
         conn = get_db_connection()
         query = text("""
-            SELECT 
-                h.MaBaiTap AS ExerciseID, 
-                b.TenBaiTap AS Title, 
-                ISNULL(b.MaMon, 'Không rõ') AS SubjectCode,
-                h.DiemSo AS Score,
-                ISNULL(b.MaDoKho, 1) AS Difficulty
-            FROM AI_LichSuLamBai h
-            JOIN BAITAP b ON h.MaBaiTap = b.Id
-            WHERE h.MaSinhVien = :sv_id
-            ORDER BY h.DiemSo DESC
+            SELECT h.MaBaiTap AS ExerciseID, b.TenBaiTap AS Title, ISNULL(b.MaMon, 'Không rõ') AS SubjectCode,
+                   h.DiemSo AS Score, ISNULL(b.MaDoKho, 1) AS Difficulty
+            FROM AI_LichSuLamBai h JOIN BAITAP b ON h.MaBaiTap = b.Id
+            WHERE h.MaSinhVien = :sv_id ORDER BY h.DiemSo DESC
         """)
         df_history = pd.read_sql(query, conn, params={"sv_id": student_id})
         conn.close()
-
-        history_list = []
-        for _, row in df_history.iterrows():
-            history_list.append({
-                "ExerciseID": int(row['ExerciseID']),
-                "Title": str(row['Title']),
-                "SubjectCode": str(row['SubjectCode']),
-                "Score": float(row['Score']),
-                "Difficulty": int(row['Difficulty'])
-            })
+        history_list = [{"ExerciseID": int(r['ExerciseID']), "Title": str(r['Title']), "SubjectCode": str(r['SubjectCode']),
+                         "Score": float(r['Score']), "Difficulty": int(r['Difficulty'])} for _, r in df_history.iterrows()]
         return {"status": "success", "history": history_list}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
 class LoginRequest(BaseModel):
     username: str
@@ -247,6 +206,9 @@ def login_user(request: LoginRequest):
         return {"status": "success", "role": df_user.iloc[0]['VaiTro'], "user_id": int(df_user.iloc[0]['MaNguoiDung']), "full_name": df_user.iloc[0]['HoTen']}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+# ==========================================
+# API GIẢNG VIÊN: ĐẾM SỐ BÀI TẬP DƯỚI 5
+# ==========================================
 @app.get("/api/teacher/overview", tags=["Giảng Viên"])
 def get_teacher_overview(x_user_role: str = Header(None, description="Bắt buộc nhập 'teacher'")):
     if x_user_role != "teacher": raise HTTPException(status_code=403, detail="Cấm truy cập!")
@@ -257,18 +219,19 @@ def get_teacher_overview(x_user_role: str = Header(None, description="Bắt bu�
         conn.close()
 
         if df_sv.empty: return {"status": "success", "weak_students_count": 0, "classes": []}
-
         df_sv['Lop'] = df_sv['HoTen'].str.extract(r'\((.*?)\)')[0].fillna('Không xác định')
 
+        # Đếm số lượng bài tập < 5.0 của TỪNG sinh viên
         if not df_diem.empty:
-            avg_scores = df_diem.groupby('MaSinhVien')['DiemSo'].mean().reset_index()
-            avg_scores.columns = ['MaNguoiDung', 'AvgScore']
-            df_sv = pd.merge(df_sv, avg_scores, on='MaNguoiDung', how='left')
+            failed_counts = df_diem[df_diem['DiemSo'] < 5.0].groupby('MaSinhVien').size().reset_index(name='FailedCount')
+            df_sv = pd.merge(df_sv, failed_counts, left_on='MaNguoiDung', right_on='MaSinhVien', how='left')
         else:
-            df_sv['AvgScore'] = 0.0
+            df_sv['FailedCount'] = 0
 
-        df_sv['AvgScore'] = df_sv['AvgScore'].fillna(0.0).round(1)
-        weak_count = int(((df_sv['AvgScore'] > 0) & (df_sv['AvgScore'] < 5.0)).sum())
+        df_sv['FailedCount'] = df_sv['FailedCount'].fillna(0).astype(int)
+        
+        # Những sinh viên bị Yếu là những người có ít nhất 1 bài < 5.0
+        weak_count = int((df_sv['FailedCount'] > 0).sum())
 
         classes_data = []
         for class_name, group in df_sv.groupby('Lop'):
@@ -278,22 +241,16 @@ def get_teacher_overview(x_user_role: str = Header(None, description="Bắt bu�
                     "user_id": int(row['MaNguoiDung']),
                     "username": str(row['TenDangNhap']),
                     "fullname": str(row['HoTen']),
-                    "avg_score": float(row['AvgScore'])
+                    "failed_count": int(row['FailedCount'])
                 })
-            
             classes_data.append({
                 "class_name": str(class_name),
                 "student_count": len(students),
                 "students": students
             })
 
-        return {
-            "status": "success",
-            "weak_students_count": weak_count,
-            "classes": classes_data
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "success", "weak_students_count": weak_count, "classes": classes_data}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 def serve_frontend():
