@@ -8,6 +8,12 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import os
 import random 
+import os
+import requests
+
+# Tự động đọc Key đã giấu trong Render hoặc file .env
+SUPA_URL = os.environ.get("SUPABASE_URL")
+SUPA_KEY = os.environ.get("SUPABASE_KEY"
 
 app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập - Hoàn Thiện")
 
