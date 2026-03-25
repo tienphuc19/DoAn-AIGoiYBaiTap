@@ -5,3 +5,5 @@ scikit-learn
 sqlalchemy
 pymssql
 pydantic
+requests
+python-dotenv
