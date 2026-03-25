@@ -7,13 +7,8 @@ from sqlalchemy import create_engine, text
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import os
-import random 
-import os
-import requests
-
-# Tự động đọc Key đã giấu trong Render hoặc file .env
-SUPA_URL = os.environ.get("SUPABASE_URL")
-SUPA_KEY = os.environ.get("SUPABASE_KEY"
+import random
+import requests  # Thư viện dùng để gọi API Supabase
 
 app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập - Hoàn Thiện")
 
@@ -25,6 +20,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ==========================================
+# CẤU HÌNH DATABASE SQL SERVER (CỦA BẠN)
+# ==========================================
 def get_db_connection():
     db_url = "mssql+pymssql://userPersonalizedSystem:123456789@118.69.126.49/Data_PersonalizedSystem"
     engine = create_engine(db_url)
@@ -45,17 +43,15 @@ def load_data_from_sql():
         return df_exercises, df_history
     except Exception as e: raise HTTPException(status_code=500, detail=f"Lỗi SQL: {str(e)}")
 
+# ==========================================
+# API LẤY CHI TIẾT BÀI TẬP VÀ CHẤM ĐIỂM
+# ==========================================
 @app.get("/api/exercise-details/{ex_id}", tags=["Sinh Viên"])
 def get_exercise_details(ex_id: int):
     conn = get_db_connection()
-    mota = "Thuật toán BFS mô phỏng việc lan tỏa như sóng nước, thăm tất cả các đỉnh gần gốc trước khi đi xa hơn. Đây là nền tảng để tìm đường đi ngắn nhất trong đồ thị không có trọng số." if ex_id == 374 else "Đang cập nhật mô tả từ cơ sở dữ liệu."
-    yeucau = "1. Sử dụng Queue để cài đặt thuật toán BFS. In ra thứ tự các đỉnh được thăm bắt đầu từ một đỉnh s cho trước." if ex_id == 374 else "1. Hoàn thành bài tập theo yêu cầu đề bài."
-    criteria_list = [
-        {"name": "Sử dụng mảng đánh dấu (Visited) để không thăm lại các đỉnh đã xử lý", "score": 40},
-        {"name": "Quản lý đúng thứ tự đưa vào và lấy ra khỏi Queue theo nguyên tắc FIFO", "score": 25},
-        {"name": "Đảm bảo thăm hết các đỉnh trong cùng một thành phần liên thông", "score": 20},
-        {"name": "Đạt độ phức tạp thời gian O(n + e)", "score": 15}
-    ] if ex_id == 374 else []
+    mota = "Đang cập nhật mô tả từ cơ sở dữ liệu."
+    yeucau = "1. Hoàn thành bài tập theo yêu cầu đề bài."
+    criteria_list = []
 
     try:
         df_bt = pd.read_sql(f"SELECT * FROM BAITAP WHERE Id = {ex_id}", conn)
@@ -69,7 +65,6 @@ def get_exercise_details(ex_id: int):
         elif 'MaDangBai' in df_tc.columns and 'MaDangBai' in df_bt.columns: df_tc_filtered = df_tc[df_tc['MaDangBai'] == df_bt['MaDangBai'].iloc[0]]
 
         if not df_tc_filtered.empty:
-            criteria_list = []
             name_col = next((col for col in ['TenTieuChi', 'NoiDung', 'TieuChi'] if col in df_tc.columns), None)
             score_col = next((col for col in ['Diem', 'TrongSo', 'Score'] if col in df_tc.columns), None)
             for _, row in df_tc_filtered.iterrows():
@@ -94,7 +89,6 @@ def mock_grade_and_submit_result(request: MockGradeRequest, x_user_role: str = H
     if x_user_role != "student": raise HTTPException(status_code=403, detail="Cấm truy cập!")
     try:
         conn = get_db_connection()
-        # Đổi thành 3.0 -> 9.5 để sinh viên có thể bị dưới 5 khi test
         final_grade = round(random.uniform(3.0, 9.5), 1) 
         query_upsert = text("""
             IF EXISTS (SELECT 1 FROM AI_LichSuLamBai WHERE MaSinhVien = :sv_id AND MaBaiTap = :ex_id)
@@ -105,9 +99,13 @@ def mock_grade_and_submit_result(request: MockGradeRequest, x_user_role: str = H
         conn.execute(query_upsert, {"sv_id": request.student_id, "ex_id": request.exercise_id, "grade": final_grade})
         conn.commit() 
         conn.close()
-        return {"status": "success", "score": final_grade, "passed": final_grade >= 5.0, "message": f"🤖 Đã chấm tự động dựa trên tiêu chí SQL."}
+        return {"status": "success", "score": final_grade, "passed": final_grade >= 5.0, "message": f"🤖 Đã chấm tự động."}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+
+# ==========================================
+# API LÕI: GỢI Ý BÀI TẬP & KẾT NỐI SUPABASE
+# ==========================================
 class RecommendRequest(BaseModel):
     student_id: int
     top_k: int = 6
@@ -116,28 +114,54 @@ class RecommendRequest(BaseModel):
 @app.post("/api/recommend", tags=["Sinh Viên"])
 def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Header(None, description="Bắt buộc nhập 'student'")):
     if x_user_role != "student": raise HTTPException(status_code=403, detail="Cấm truy cập!")
+    
+    # 1. GỌI API SUPABASE LẤY ĐIỂM TỔNG KẾT TỪ NHÓM BẠN LÊ QUỐC ANH
+    fixed_avg_score = 0.0
+    academic_rank = "Chưa có điểm"
+    
+    supa_url = "https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores"
+    supa_key = "sb_secret_76cOuLlwxBHLBpVj59j-6w_WRnljKgX"
+    headers = {
+        "apikey": supa_key,
+        "Authorization": f"Bearer {supa_key}"
+    }
+    # Lọc lấy đúng dòng của sinh viên đang đăng nhập (student_id = request.student_id)
+    params = {"student_id": f"eq.{request.student_id}"}
+    
+    try:
+        response = requests.get(supa_url, headers=headers, params=params, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if len(data) > 0:
+                # Trích xuất điểm và xếp loại từ API Supabase trả về
+                fixed_avg_score = round(float(data[0].get('integrated_score', 0.0)), 1)
+                academic_rank = str(data[0].get('classification', 'Chưa có điểm'))
+    except Exception as e:
+        print(f"Lỗi khi gọi API Supabase: {e}")
+
+    # 2. TẢI DỮ LIỆU ĐỂ CHẠY AI GỢI Ý (Luồng riêng của nhóm bạn)
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
     if request.subject_code:
         df_exercises = df_exercises[df_exercises['SubjectCode'].str.contains(request.subject_code, case=False, na=False)].reset_index(drop=True)
     
     student_history = df_history[df_history['StudentID'] == request.student_id]
-    if not student_history.empty:
-        avg_score = round(student_history['Score'].mean(), 1)
-        academic_rank = "Giỏi" if avg_score >= 8.0 else ("Khá" if avg_score >= 6.5 else ("Trung Bình" if avg_score >= 5.0 else "Yếu"))
-    else:
-        avg_score = 0.0; academic_rank = "Chưa có bài tập"
-
-    if df_exercises.empty: return {"status": "success", "cf_error_message": "Không có bài tập.", "avg_score": avg_score, "academic_rank": academic_rank, "recommendations": []}
+    
+    if df_exercises.empty: 
+        return {"status": "success", "cf_error_message": "Không có bài tập.", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "recommendations": []}
 
     all_attempts_ids = student_history['ExerciseID'].tolist()
     passed_exercises_ids = student_history[student_history['Score'] >= 5.0]['ExerciseID'].tolist()
+    
+    # LEVEL dựa trên bài tập khó nhất đã vượt qua
     current_level = df_exercises[df_exercises['ExerciseID'].isin(passed_exercises_ids)]['Difficulty'].max() if passed_exercises_ids else 1
     if pd.isna(current_level): current_level = 1
 
     candidate_exercises = df_exercises[(~df_exercises['ExerciseID'].isin(all_attempts_ids)) & (df_exercises['Difficulty'] <= current_level + 2)]
-    if candidate_exercises.empty: return {"status": "success", "cf_error_message": "Đã làm hết bài.", "avg_score": avg_score, "academic_rank": academic_rank, "recommendations": []}
+    if candidate_exercises.empty: 
+        return {"status": "success", "cf_error_message": "Đã làm hết bài.", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "recommendations": []}
 
+    # THUẬT TOÁN 1: Content-Based Filtering (TF-IDF + Cosine Similarity)
     tfidf = TfidfVectorizer()
     tfidf_matrix = tfidf.fit_transform(df_exercises['Tags'])
     cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
@@ -146,6 +170,7 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
     if type(sim_scores_cb) != list and sim_scores_cb.max() > sim_scores_cb.min():
         sim_scores_cb = (sim_scores_cb - sim_scores_cb.min()) / (sim_scores_cb.max() - sim_scores_cb.min())
 
+    # THUẬT TOÁN 2: Collaborative Filtering (Item-Based)
     try:
         df_pivot = df_history.pivot_table(index='StudentID', columns='ExerciseID', values='Score')
         if df_pivot.shape[0] < 2 or request.student_id not in df_pivot.index: raise Exception("CF Inactive")
@@ -164,6 +189,7 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
         scores_cf, cf_error_msg = cf_scores_list, False 
     except Exception as e: scores_cf, cf_error_msg = None, e
 
+    # LAI GHÉP HAI THUẬT TOÁN (Trọng số 60% CBF - 40% CF)
     final_recommendations_with_score = []
     cb_scores_dict = {df_exercises.iloc[idx]['ExerciseID']: sim_scores_cb[idx] for idx in df_exercises.index} if passed_indices else {}
     cf_scores_dict = {df_exercises.iloc[idx]['ExerciseID']: scores_cf[idx] for idx in df_exercises.index} if scores_cf is not None else {}
@@ -175,10 +201,15 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
         final_recommendations_with_score.append({"exercise": row.to_dict(), "final_hybrid_score": float(final_score)})
 
     sorted_recommendations = sorted(final_recommendations_with_score, key=lambda x: x['final_hybrid_score'], reverse=True)
-    return {"status": "success", "current_level": int(current_level), "avg_score": float(avg_score), "academic_rank": academic_rank,
+    
+    # Trả về Giao diện: Điểm cố định (từ Supabase) + Gợi ý bài tập động (từ SQL)
+    return {"status": "success", "current_level": int(current_level), "avg_score": float(fixed_avg_score), "academic_rank": academic_rank,
             "cf_error_message": str(cf_error_msg) if cf_error_msg else "Item-Based Collaborative Filtering is ACTIVE.",
             "recommendations": [item['exercise'] for item in sorted_recommendations[:request.top_k]]}
 
+# ==========================================
+# CÁC API KHÁC (Lịch sử, Login, Dashboard)
+# ==========================================
 @app.get("/api/history/{student_id}", tags=["Sinh Viên"])
 def get_student_history(student_id: int, x_user_role: str = Header(None, description="Bắt buộc nhập 'student'")):
     if x_user_role != "student": raise HTTPException(status_code=403, detail="Cấm truy cập!")
@@ -212,9 +243,6 @@ def login_user(request: LoginRequest):
         return {"status": "success", "role": df_user.iloc[0]['VaiTro'], "user_id": int(df_user.iloc[0]['MaNguoiDung']), "full_name": df_user.iloc[0]['HoTen']}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
-# ==========================================
-# API GIẢNG VIÊN: ĐẾM SỐ BÀI TẬP DƯỚI 5
-# ==========================================
 @app.get("/api/teacher/overview", tags=["Giảng Viên"])
 def get_teacher_overview(x_user_role: str = Header(None, description="Bắt buộc nhập 'teacher'")):
     if x_user_role != "teacher": raise HTTPException(status_code=403, detail="Cấm truy cập!")
@@ -227,7 +255,6 @@ def get_teacher_overview(x_user_role: str = Header(None, description="Bắt bu�
         if df_sv.empty: return {"status": "success", "weak_students_count": 0, "classes": []}
         df_sv['Lop'] = df_sv['HoTen'].str.extract(r'\((.*?)\)')[0].fillna('Không xác định')
 
-        # Đếm số lượng bài tập < 5.0 của TỪNG sinh viên
         if not df_diem.empty:
             failed_counts = df_diem[df_diem['DiemSo'] < 5.0].groupby('MaSinhVien').size().reset_index(name='FailedCount')
             df_sv = pd.merge(df_sv, failed_counts, left_on='MaNguoiDung', right_on='MaSinhVien', how='left')
@@ -235,25 +262,14 @@ def get_teacher_overview(x_user_role: str = Header(None, description="Bắt bu�
             df_sv['FailedCount'] = 0
 
         df_sv['FailedCount'] = df_sv['FailedCount'].fillna(0).astype(int)
-        
-        # Những sinh viên bị Yếu là những người có ít nhất 1 bài < 5.0
         weak_count = int((df_sv['FailedCount'] > 0).sum())
 
         classes_data = []
         for class_name, group in df_sv.groupby('Lop'):
             students = []
             for _, row in group.iterrows():
-                students.append({
-                    "user_id": int(row['MaNguoiDung']),
-                    "username": str(row['TenDangNhap']),
-                    "fullname": str(row['HoTen']),
-                    "failed_count": int(row['FailedCount'])
-                })
-            classes_data.append({
-                "class_name": str(class_name),
-                "student_count": len(students),
-                "students": students
-            })
+                students.append({"user_id": int(row['MaNguoiDung']), "username": str(row['TenDangNhap']), "fullname": str(row['HoTen']), "failed_count": int(row['FailedCount'])})
+            classes_data.append({"class_name": str(class_name), "student_count": len(students), "students": students})
 
         return {"status": "success", "weak_students_count": weak_count, "classes": classes_data}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
