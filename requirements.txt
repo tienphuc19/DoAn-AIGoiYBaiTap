@@ -7,3 +7,4 @@ pymssql
 pydantic
 requests
 python-dotenv
+python-dotenv
