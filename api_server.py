@@ -8,7 +8,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import os
 import random
-import requests  # Thư viện dùng để gọi API Supabase
+import requests
+from dotenv import load_dotenv
+
+# Tải các biến môi trường từ file .env (nếu chạy ở máy cá nhân)
+load_dotenv()
 
 app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập - Hoàn Thiện")
 
@@ -115,31 +119,32 @@ class RecommendRequest(BaseModel):
 def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Header(None, description="Bắt buộc nhập 'student'")):
     if x_user_role != "student": raise HTTPException(status_code=403, detail="Cấm truy cập!")
     
-    # 1. GỌI API SUPABASE LẤY ĐIỂM TỔNG KẾT TỪ NHÓM BẠN LÊ QUỐC ANH
+    # 1. GỌI API SUPABASE LẤY ĐIỂM TỔNG KẾT (BẢO MẬT KEY)
     fixed_avg_score = 0.0
     academic_rank = "Chưa có điểm"
     
     supa_url = "https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores"
-    supa_key = "sb_secret_76cOuLlwxBHLBpVj59j-6w_WRnljKgX"
-    headers = {
-        "apikey": supa_key,
-        "Authorization": f"Bearer {supa_key}"
-    }
-    # Lọc lấy đúng dòng của sinh viên đang đăng nhập (student_id = request.student_id)
-    params = {"student_id": f"eq.{request.student_id}"}
+    # Lấy key từ biến môi trường (Render) hoặc file .env
+    supa_key = os.getenv("SUPABASE_KEY")
     
-    try:
-        response = requests.get(supa_url, headers=headers, params=params, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            if len(data) > 0:
-                # Trích xuất điểm và xếp loại từ API Supabase trả về
-                fixed_avg_score = round(float(data[0].get('integrated_score', 0.0)), 1)
-                academic_rank = str(data[0].get('classification', 'Chưa có điểm'))
-    except Exception as e:
-        print(f"Lỗi khi gọi API Supabase: {e}")
+    if supa_key:
+        headers = {
+            "apikey": supa_key,
+            "Authorization": f"Bearer {supa_key}"
+        }
+        params = {"student_id": f"eq.{request.student_id}"}
+        
+        try:
+            response = requests.get(supa_url, headers=headers, params=params, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if len(data) > 0:
+                    fixed_avg_score = round(float(data[0].get('integrated_score', 0.0)), 1)
+                    academic_rank = str(data[0].get('classification', 'Chưa có điểm'))
+        except Exception as e:
+            print(f"Lỗi khi gọi API Supabase: {e}")
 
-    # 2. TẢI DỮ LIỆU ĐỂ CHẠY AI GỢI Ý (Luồng riêng của nhóm bạn)
+    # 2. TẢI DỮ LIỆU ĐỂ CHẠY AI GỢI Ý
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
     if request.subject_code:
@@ -153,7 +158,6 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
     all_attempts_ids = student_history['ExerciseID'].tolist()
     passed_exercises_ids = student_history[student_history['Score'] >= 5.0]['ExerciseID'].tolist()
     
-    # LEVEL dựa trên bài tập khó nhất đã vượt qua
     current_level = df_exercises[df_exercises['ExerciseID'].isin(passed_exercises_ids)]['Difficulty'].max() if passed_exercises_ids else 1
     if pd.isna(current_level): current_level = 1
 
@@ -161,7 +165,7 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
     if candidate_exercises.empty: 
         return {"status": "success", "cf_error_message": "Đã làm hết bài.", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "recommendations": []}
 
-    # THUẬT TOÁN 1: Content-Based Filtering (TF-IDF + Cosine Similarity)
+    # THUẬT TOÁN 1: Content-Based Filtering
     tfidf = TfidfVectorizer()
     tfidf_matrix = tfidf.fit_transform(df_exercises['Tags'])
     cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
@@ -170,7 +174,7 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
     if type(sim_scores_cb) != list and sim_scores_cb.max() > sim_scores_cb.min():
         sim_scores_cb = (sim_scores_cb - sim_scores_cb.min()) / (sim_scores_cb.max() - sim_scores_cb.min())
 
-    # THUẬT TOÁN 2: Collaborative Filtering (Item-Based)
+    # THUẬT TOÁN 2: Collaborative Filtering
     try:
         df_pivot = df_history.pivot_table(index='StudentID', columns='ExerciseID', values='Score')
         if df_pivot.shape[0] < 2 or request.student_id not in df_pivot.index: raise Exception("CF Inactive")
@@ -189,7 +193,7 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
         scores_cf, cf_error_msg = cf_scores_list, False 
     except Exception as e: scores_cf, cf_error_msg = None, e
 
-    # LAI GHÉP HAI THUẬT TOÁN (Trọng số 60% CBF - 40% CF)
+    # LAI GHÉP HAI THUẬT TOÁN
     final_recommendations_with_score = []
     cb_scores_dict = {df_exercises.iloc[idx]['ExerciseID']: sim_scores_cb[idx] for idx in df_exercises.index} if passed_indices else {}
     cf_scores_dict = {df_exercises.iloc[idx]['ExerciseID']: scores_cf[idx] for idx in df_exercises.index} if scores_cf is not None else {}
@@ -202,7 +206,6 @@ def get_recommendations_hybrid(request: RecommendRequest, x_user_role: str = Hea
 
     sorted_recommendations = sorted(final_recommendations_with_score, key=lambda x: x['final_hybrid_score'], reverse=True)
     
-    # Trả về Giao diện: Điểm cố định (từ Supabase) + Gợi ý bài tập động (từ SQL)
     return {"status": "success", "current_level": int(current_level), "avg_score": float(fixed_avg_score), "academic_rank": academic_rank,
             "cf_error_message": str(cf_error_msg) if cf_error_msg else "Item-Based Collaborative Filtering is ACTIVE.",
             "recommendations": [item['exercise'] for item in sorted_recommendations[:request.top_k]]}
