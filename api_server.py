@@ -214,12 +214,14 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     # Sắp xếp từ điểm phù hợp cao xuống thấp
     sorted_recommendations = sorted(final_recommendations_with_score, key=lambda x: x['final_score'], reverse=True)
     
+    # Trả về dữ liệu chuyên nghiệp
     return {
         "status": "success", 
         "current_level": int(current_level), 
         "avg_score": float(fixed_avg_score), 
         "academic_rank": academic_rank,
-        "cf_error_message": "AI Đang hoạt động (Content-Based Filtering)",
+        # TRẢ VỀ ĐIỂM MÔN HỌC (làm tròn 1 chữ số thập phân)
+        "subject_score": round(float(course_score), 1), 
         "recommendations": [item['exercise'] for item in sorted_recommendations[:request.top_k]]
     }
 
