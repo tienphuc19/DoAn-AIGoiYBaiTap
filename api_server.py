@@ -158,10 +158,11 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
 
     all_attempts_ids = student_history['ExerciseID'].tolist()
     
-    # Chỉ tính những bài đã pass CỦA MÔN HỌC ĐANG CHỌN
-    passed_exercises_of_subject = student_history[(student_history['Score'] >= 5.0) & (student_history['SubjectCode'].str.contains(request.subject_code, case=False, na=False))]
-    passed_exercises_ids = passed_exercises_of_subject['ExerciseID'].tolist()
-    
+    # Lấy các bài đã qua môn (điểm >= 5.0) và khớp mã bài với môn học hiện tại
+    passed_exercises_ids = student_history[
+        (student_history['Score'] >= 5.0) & 
+        (student_history['ExerciseID'].isin(df_exercises['ExerciseID']))
+    ]['ExerciseID'].tolist()
     # 3. LOGIC CÁ NHÂN HÓA TRÌNH ĐỘ (DYNAMIC LEVEL)
     str_student_id = str(request.student_id)
     
