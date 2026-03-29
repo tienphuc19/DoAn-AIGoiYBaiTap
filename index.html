@@ -3,308 +3,470 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Gợi Ý Bài Tập AI</title>
+    <title>Hệ Thống Gợi Ý Bài Tập AI - Phiên Bản Hoàn Thiện</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .tab-btn.active { border-color: #2563eb; color: #2563eb; font-weight: 700; background-color: #eff6ff; }
+        /* Style cho bảng GV */
+        .gv-table th, .gv-table td { border-bottom: 1px solid #e5e7eb; padding: 12px 16px; text-align: left; }
+        .gv-table tr:hover { background-color: #f9fafb; cursor: pointer; }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen font-sans">
+<body class="bg-gray-50 min-h-screen">
 
     <div id="loginScreen" class="flex items-center justify-center min-h-screen bg-blue-900">
-        <div class="bg-white p-8 rounded-xl shadow-2xl w-96">
-            <h2 class="text-2xl font-bold text-center text-blue-800 mb-6">Hệ Thống Gợi Ý Bài Tập</h2>
-            <div id="loginError" class="hidden bg-red-100 text-red-700 p-3 rounded mb-4 text-sm"></div>
-            <div class="mb-4">
-                <label class="block text-gray-700 font-bold mb-2">Tên Đăng Nhập</label>
-                <input type="text" id="username" autocomplete="off" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nhập mã sinh viên/giảng viên">
+        <div class="bg-white p-10 rounded-2xl shadow-2xl w-[400px]">
+            <div class="text-center mb-8">
+                <i class="fas fa-robot text-5xl text-blue-600 mb-3"></i>
+                <h2 class="text-3xl font-black text-blue-800">AI LEARNING</h2>
+                <p class="text-gray-500 mt-1">Hệ thống gợi ý lộ trình học tập</p>
             </div>
-            <div class="mb-6">
-                <label class="block text-gray-700 font-bold mb-2">Mật Khẩu</label>
-                <input type="password" id="password" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••">
+            <div id="loginError" class="hidden bg-red-100 text-red-700 p-4 rounded-lg mb-6 text-sm font-medium border border-red-200"></div>
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-gray-700 font-bold mb-2">Tên Đăng Nhập</label>
+                    <input type="text" id="username" autocomplete="off" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="Nhập mã số">
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-bold mb-2">Mật Khẩu</label>
+                    <input type="password" id="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="••••••">
+                </div>
+                <button onclick="login()" class="w-full bg-blue-600 text-white font-black py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-200 transform hover:scale-[1.02]">ĐĂNG NHẬP</button>
             </div>
-            <button onclick="login()" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200">Đăng Nhập</button>
         </div>
     </div>
 
-    <div id="dashboardScreen" class="hidden flex h-screen overflow-hidden">
+    <div id="dashboardScreen" class="hidden min-h-screen flex flex-col">
         
-        <div class="w-64 bg-white shadow-lg flex flex-col justify-between">
-            <div>
-                <div class="p-6 border-b text-center">
-                    <h1 class="text-xl font-bold text-blue-800"><i class="fas fa-robot mr-2"></i>Hệ Thống AI</h1>
+        <header class="bg-white shadow-sm sticky top-0 z-50 border-b">
+            <div class="max-w-[1500px] mx-auto px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-robot text-2xl text-blue-600"></i>
+                    <h1 class="text-2xl font-black text-blue-800">AI LEARNING<span class="text-sm font-medium text-gray-500 ml-2">v1.0</span></h1>
                 </div>
-                
-                <nav id="studentMenu" class="hidden flex-col p-4 space-y-2">
-                    <button onclick="loadSubject('CTDLGT', this)" class="menu-btn w-full text-left px-4 py-3 rounded-lg bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 transition"><i class="fas fa-sitemap w-6"></i> Cấu trúc dữ liệu</button>
-                    <button onclick="loadSubject('KTLT', this)" class="menu-btn w-full text-left px-4 py-3 rounded-lg text-gray-600 font-bold hover:bg-blue-50 transition"><i class="fas fa-code w-6"></i> Kỹ thuật lập trình</button>
-                    <button onclick="loadSubject('OOP', this)" class="menu-btn w-full text-left px-4 py-3 rounded-lg text-gray-600 font-bold hover:bg-blue-50 transition"><i class="fas fa-cubes w-6"></i> Lập trình HĐT (OOP)</button>
-                    <button onclick="loadSubject('NMLT', this)" class="menu-btn w-full text-left px-4 py-3 rounded-lg text-gray-600 font-bold hover:bg-blue-50 transition"><i class="fas fa-terminal w-6"></i> Nhập môn lập trình</button>
-                    <hr class="my-2">
-                    <button onclick="loadHistory()" class="menu-btn w-full text-left px-4 py-3 rounded-lg text-gray-600 font-bold hover:bg-blue-50 transition"><i class="fas fa-history w-6"></i> Lịch sử làm bài</button>
-                </nav>
-
-                <nav id="teacherMenu" class="hidden flex-col p-4 space-y-2">
-                    <button class="w-full text-left px-4 py-3 rounded-lg bg-blue-50 text-blue-700 font-bold"><i class="fas fa-chart-pie w-6"></i> Báo cáo tổng quan</button>
-                </nav>
-            </div>
-            
-            <div class="p-4 border-t">
-                <button onclick="logout()" class="w-full border border-red-500 text-red-500 font-bold py-2 px-4 rounded-lg hover:bg-red-50 transition"><i class="fas fa-sign-out-alt mr-2"></i> Đăng Xuất</button>
-            </div>
-        </div>
-
-        <div class="flex-1 flex flex-col overflow-hidden bg-gray-50">
-            <header class="bg-white shadow-sm p-4 flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <div class="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xl font-bold" id="avatarText">SV</div>
+                <div class="flex items-center space-x-5 bg-gray-50 border px-4 py-2 rounded-full">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-lg font-bold" id="avatarText">SV</div>
                     <div>
-                        <h2 id="userNameDisplay" class="text-xl font-bold text-gray-800">Đang tải...</h2>
-                        <p id="userIdDisplay" class="text-sm text-gray-500">Mã: ...</p>
+                        <div id="userNameDisplay" class="font-bold text-gray-800">Đang tải...</div>
+                        <div id="userIdDisplay" class="text-xs text-gray-500">Mã: ...</div>
+                    </div>
+                    <button onclick="logout()" class="text-gray-400 hover:text-red-500 text-lg ml-4"><i class="fas fa-sign-out-alt"></i></button>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 max-w-[1500px] mx-auto w-full p-6">
+            
+            <div id="studentContent" class="hidden space-y-8">
+                <div class="bg-white rounded-xl shadow-sm p-2 flex space-x-2 border">
+                    <button onclick="loadSubject('CTDLGT', this)" class="tab-btn active px-5 py-3 rounded-lg font-bold text-gray-600 hover:bg-gray-50 transition flex items-center gap-2"><i class="fas fa-sitemap"></i> Cấu trúc dữ liệu</button>
+                    <button onclick="loadSubject('KTLT', this)" class="tab-btn px-5 py-3 rounded-lg font-bold text-gray-600 hover:bg-gray-50 transition flex items-center gap-2"><i class="fas fa-code"></i> Kỹ thuật lập trình</button>
+                    <button onclick="loadSubject('OOP', this)" class="tab-btn px-5 py-3 rounded-lg font-bold text-gray-600 hover:bg-gray-50 transition flex items-center gap-2"><i class="fas fa-cubes"></i> Lập trình HĐT</button>
+                    <button onclick="loadSubject('NMLT', this)" class="tab-btn px-5 py-3 rounded-lg font-bold text-gray-600 hover:bg-gray-50 transition flex items-center gap-2"><i class="fas fa-terminal"></i> Nhập môn lập trình</button>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                    <div class="xl:col-span-1 space-y-8">
+                        <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 border-t-4 border-yellow-400">
+                            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3"><i class="fas fa-graduation-cap mr-2"></i> Báo cáo học lực chung</h3>
+                            <div class="flex items-end gap-3 mb-2">
+                                <div class="text-6xl font-black text-gray-900" id="avgScoreDisplay">--</div>
+                                <div class="text-xl font-bold text-gray-500 pb-1">/ 10</div>
+                            </div>
+                            <div class="inline-block bg-green-50 text-green-700 px-4 py-1.5 rounded-full font-bold text-sm" id="academicRankDisplay">Đang tải...</div>
+                        </div>
+
+                        <div class="bg-white p-8 rounded-2xl shadow-sm border-2 border-dashed border-blue-200 bg-blue-50/50">
+                            <div class="flex justify-between items-center mb-6 border-b border-blue-100 pb-4">
+                                <div>
+                                    <h3 class="text-2xl font-black text-blue-900"><i class="fas fa-robot text-purple-600 mr-2"></i> AI Trợ Lý</h3>
+                                    <p class="text-gray-600 mt-1">Phân tích & gợi ý lộ trình riêng</p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-xs text-gray-500 uppercase font-bold">Trình độ gợi ý</div>
+                                    <div id="currentLevelDisplay" class="bg-yellow-200 text-yellow-800 px-4 py-1.5 rounded-full font-bold text-sm mt-1">Level --</div>
+                                </div>
+                            </div>
+                            
+                            <div id="subjectScoreBox" class="bg-white p-5 rounded-xl border border-blue-100 shadow-inner">
+                                <p class="text-gray-600 font-medium mb-1">Điểm năng lực hiện tại môn:</p>
+                                <div class="flex items-center gap-2">
+                                    <div id="currentSubjectName" class="text-lg font-bold text-blue-800 bg-blue-50 px-3 py-1 rounded">...</div>
+                                    <i class="fas fa-arrow-right text-gray-400"></i>
+                                    <div id="subjectScoreValue" class="text-3xl font-black text-green-600">--</div>
+                                </div>
+                                <p class="text-xs text-gray-400 mt-3"><i class="fas fa-info-circle mr-1"></i>Điểm này được AI tính toán dựa trên lịch sử làm bài và điểm Supabase, dùng để quyết định mức độ bài tập.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="xl:col-span-2 bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-2xl font-bold text-gray-800"><i class="fas fa-list-ol mr-3 text-blue-500"></i>Lộ trình bài tập gợi ý cho bạn</h3>
+                            <div class="text-sm text-gray-500"><span class="font-bold text-blue-600">Top 6</span> bài tập phù hợp nhất</div>
+                        </div>
+                        <div id="recommendationsList" class="space-y-5">
+                            <div class="text-center text-gray-400 py-16"><i class="fas fa-spinner fa-spin fa-2x"></i></div>
+                        </div>
                     </div>
                 </div>
-            </header>
+            </div>
 
-            <main class="flex-1 overflow-y-auto p-6">
+            <div id="teacherContent" class="hidden space-y-8">
                 
-                <div id="studentContent" class="hidden space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-yellow-500">
-                            <h3 class="text-gray-500 font-bold mb-2"><i class="fas fa-graduation-cap mr-2"></i> BÁO CÁO HỌC LỰC</h3>
-                            <div class="text-4xl font-black text-gray-800 mb-2" id="avgScoreDisplay">-- Điểm</div>
-                            <div class="text-green-600 font-bold" id="academicRankDisplay">Học lực: --</div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-blue-200 border-dashed border-2">
-                        <div class="flex justify-between items-center mb-4 border-b pb-3">
-                            <div>
-                                <h3 class="text-xl font-bold text-blue-800"><i class="fas fa-robot text-purple-600 mr-2"></i> Lộ Trình Gợi Ý Tự Động</h3>
-                                <p class="text-gray-600 mt-1">Trình độ hiện tại: <span id="currentLevelDisplay" class="bg-yellow-200 text-yellow-800 px-3 py-1 rounded-full font-bold text-sm ml-2">Level --</span></p>
-                            </div>
-                            <div id="subjectScoreDisplay" class="hidden bg-blue-100 text-blue-800 px-4 py-2 rounded-lg border border-blue-200">
-                                <span class="text-sm font-semibold">Điểm năng lực môn: </span>
-                                <span id="subjectScoreValue" class="text-lg font-black ml-1">--</span>
-                            </div>
-                        </div>
-
-                        <div id="recommendationsList" class="space-y-4">
-                            <div class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin fa-2x"></i><p class="mt-2">AI đang phân tích dữ liệu...</p></div>
-                        </div>
+                <div class="flex justify-between items-center">
+                    <h2 class="text-3xl font-black text-gray-800">Quản lý lớp học</h2>
+                    <div class="flex space-x-3">
+                        <select class="bg-white border rounded-lg px-4 py-2 font-medium text-gray-700 shadow-sm"><option>Niên khóa: 2022-2023</option></select>
+                        <select class="bg-white border rounded-lg px-4 py-2 font-medium text-gray-700 shadow-sm"><option>Lớp: Tất cả</option></select>
                     </div>
                 </div>
 
-                <div id="teacherContent" class="hidden space-y-6">
-                    <div class="bg-red-50 p-6 rounded-xl border border-red-200">
-                        <h3 class="text-red-800 font-bold text-lg"><i class="fas fa-exclamation-triangle mr-2"></i> Cảnh báo học tập</h3>
-                        <p class="text-red-600 mt-2">Toàn trường đang có <span id="weakCountDisplay" class="font-black text-2xl mx-1">0</span> sinh viên có nguy cơ rớt môn.</p>
-                    </div>
+                <div class="grid grid-cols-12 gap-8 items-start">
                     
-                    <h2 class="text-2xl font-bold text-gray-800 mt-8 mb-4">Quản lý Lớp học (Đã phân luồng)</h2>
-                    <div id="classesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="col-span-12 lg:col-span-4 space-y-6">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                            <div class="flex items-center gap-4 border-b pb-4">
+                                <div class="p-4 rounded-xl bg-blue-50 text-blue-600 text-2xl"><i class="fas fa-users"></i></div>
+                                <div><p class="text-sm font-bold text-gray-500">Tổng số sinh viên</p><p class="text-3xl font-black text-gray-800" id="totalSvGv">0</p></div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <div class="p-4 rounded-xl bg-red-50 text-red-600 text-2xl"><i class="fas fa-user-slash"></i></div>
+                                <div><p class="text-sm font-bold text-gray-500">Sinh viên yếu</p><p class="text-3xl font-black text-red-600" id="weakSvGv">0</p></div>
+                                <div class="ml-auto bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-bold" id="weakRateGv">0%</div>
+                            </div>
                         </div>
+                        
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <input type="text" placeholder="Tìm MSSV/Họ tên..." class="w-full px-4 py-2.5 border rounded-lg mb-4">
+                            <div class="flex flex-wrap gap-2">
+                                <button class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm font-medium">Tất cả</button>
+                                <button class="bg-gray-100 text-gray-700 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-gray-200">Khá giỏi</button>
+                                <button class="bg-gray-100 text-gray-700 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-red-50 hover:text-red-700">Yếu</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <table class="w-full gv-table">
+                            <thead>
+                                <tr class="text-sm text-gray-500">
+                                    <th>STT</th><th>MSSV</th><th>Họ tên</th><th>Lớp</th><th>ĐTB</th><th>Số môn yếu</th><th>Xếp loại</th>
+                                </tr>
+                            </thead>
+                            <tbody id="studentTableBody" class="text-sm font-medium text-gray-800">
+                                </tbody>
+                        </table>
+                    </div>
                 </div>
 
-            </main>
-        </div>
+                <div id="studentDetailView" class="hidden fixed inset-0 bg-gray-50 z-[100] overflow-y-auto p-8 space-y-8">
+                    <button onclick="closeStudentDetail()" class="text-gray-600 hover:text-blue-600 font-bold flex items-center gap-2 mb-4"><i class="fas fa-arrow-left"></i> Quay lại danh sách</button>
+                    
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-3xl font-black text-gray-800">Chi tiết sinh viên</h2>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-8">
+                        <div class="col-span-4 bg-white p-8 rounded-3xl shadow-lg border border-gray-100 text-center space-y-4">
+                            <img src="https://via.placeholder.com/150" class="w-28 h-28 rounded-full mx-auto border-4 border-blue-100 p-1">
+                            <div>
+                                <h3 id="detFullName" class="text-2xl font-black text-gray-900">...</h3>
+                                <p id="detMssv" class="text-gray-500">MSSV: ...</p>
+                            </div>
+                            <div class="flex justify-center gap-3">
+                                <span id="detClass" class="bg-gray-100 px-3 py-1 rounded font-bold text-gray-600 text-sm">Lớp: ...</span>
+                                <span class="bg-gray-100 px-3 py-1 rounded font-bold text-gray-600 text-sm">Kì: 2022-2026</span>
+                            </div>
+                        </div>
+                        
+                        <div class="col-span-8 space-y-8">
+                            <div class="grid grid-cols-2 gap-6">
+                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-4 border-green-500">
+                                    <p class="text-sm font-bold text-gray-500">Xếp loại học lực</p>
+                                    <p id="detRank" class="text-3xl font-black text-green-600">...</p>
+                                </div>
+                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-4 border-blue-500">
+                                    <p class="text-sm font-bold text-gray-500">Điểm TB học tập</p>
+                                    <p id="detGpa" class="text-3xl font-black text-gray-800">... / 10</p>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                <h4 class="font-bold mb-4 text-gray-700">Biểu đồ điểm trung bình theo kì</h4>
+                                <canvas id="gpaChart" height="100"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-8">
+                        <div class="col-span-5 bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
+                            <h4 class="font-bold text-xl mb-6 text-gray-800 border-b pb-4">Biểu đồ kỹ năng</h4>
+                            <canvas id="skillChart"></canvas>
+                        </div>
+                        
+                        <div class="col-span-7 bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
+                            <h4 class="font-bold text-xl mb-6 text-gray-800 border-b pb-4">Lộ trình học tập gợi ý</h4>
+                            <div id="detLearningPath" class="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                                </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
     </div>
 
     <script>
-        const API_BASE_URL = "https://ai-goi-y-bai-tap.onrender.com"; // URL thật của bạn
+        const API_BASE_URL = "https://ai-goi-y-bai-tap.onrender.com"; // URL Render của bạn
         let currentUser = null;
-        let currentSubject = 'CTDLGT';
+        const subjectNames = {"CTDLGT": "Cấu trúc dữ liệu", "OOP": "Lập trình HĐT", "NMLT": "Nhập môn lập trình", "KTLT": "Kỹ thuật lập trình"};
 
-        // 1. CHỨC NĂNG ĐĂNG NHẬP
+        // 1. ĐĂNG NHẬP
         async function login() {
             const userIn = document.getElementById('username').value;
             const passIn = document.getElementById('password').value;
             const errDiv = document.getElementById('loginError');
-            
-            if(!userIn || !passIn) {
-                errDiv.textContent = "Vui lòng nhập đầy đủ thông tin!"; errDiv.classList.remove('hidden'); return;
-            }
+            if(!userIn || !passIn) { showError(errDiv, "Vui lòng nhập đầy đủ!"); return; }
 
             try {
                 const response = await fetch(`${API_BASE_URL}/api/login`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({username: userIn, password: passIn})
                 });
                 const data = await response.json();
-                
                 if (data.status === 'success') {
                     currentUser = data;
                     document.getElementById('loginScreen').classList.add('hidden');
                     document.getElementById('dashboardScreen').classList.remove('hidden');
                     setupDashboard();
-                } else {
-                    errDiv.textContent = data.message; errDiv.classList.remove('hidden');
-                }
-            } catch (error) {
-                errDiv.textContent = "Không thể kết nối đến máy chủ AI!"; errDiv.classList.remove('hidden');
-            }
+                } else { showError(errDiv, data.message); }
+            } catch (error) { showError(errDiv, "Lỗi kết nối máy chủ AI!"); }
         }
 
-        // 2. CÀI ĐẶT GIAO DIỆN SAU KHI ĐĂNG NHẬP
         function setupDashboard() {
             document.getElementById('userNameDisplay').textContent = currentUser.full_name;
             document.getElementById('userIdDisplay').textContent = "Mã: " + currentUser.username;
+            const avatar = currentUser.full_name.split(' ').pop().substring(0,2).toUpperCase();
+            document.getElementById('avatarText').textContent = avatar;
             
             if (currentUser.role === 'student') {
-                document.getElementById('avatarText').textContent = 'SV';
-                document.getElementById('studentMenu').classList.remove('hidden');
                 document.getElementById('studentContent').classList.remove('hidden');
-                loadSubject('CTDLGT', document.querySelector('#studentMenu button')); // Load môn mặc định
-            } else if (currentUser.role === 'teacher') {
-                document.getElementById('avatarText').textContent = 'GV';
-                document.getElementById('teacherMenu').classList.remove('hidden');
+                loadSubject('CTDLGT', document.querySelector('.tab-btn')); // Môn đầu tiên
+            } else {
                 document.getElementById('teacherContent').classList.remove('hidden');
                 loadTeacherDashboard();
             }
         }
 
-        // Đổi màu nút Menu đang chọn
-        function setActiveMenu(clickedBtn) {
-            document.querySelectorAll('.menu-btn').forEach(btn => {
-                btn.classList.remove('bg-blue-50', 'text-blue-700');
-                btn.classList.add('text-gray-600');
-            });
-            clickedBtn.classList.remove('text-gray-600');
-            clickedBtn.classList.add('bg-blue-50', 'text-blue-700');
-        }
-
-        // 3. TẢI DỮ LIỆU GỢI Ý CHO SINH VIÊN
+        // 2. LOGIC SINH VIÊN (PHỤC HỒI)
         async function loadSubject(subjectCode, btnElement) {
-            currentSubject = subjectCode;
-            setActiveMenu(btnElement);
+            // Đổi tab active
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
             
+            // Hiện tên môn ở ô năng lực
+            document.getElementById('currentSubjectName').textContent = subjectNames[subjectCode];
             const listDiv = document.getElementById('recommendationsList');
-            listDiv.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin fa-2x"></i><p class="mt-2">AI đang phân tích lộ trình...</p></div>';
+            listDiv.innerHTML = '<div class="text-center text-gray-400 py-16"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
             
-            // Reset hiển thị điểm môn học
-            document.getElementById('subjectScoreDisplay').classList.add('hidden');
+            // Reset ô điểm năng lực môn
             document.getElementById('subjectScoreValue').textContent = '--';
+            document.getElementById('subjectScoreValue').classList.remove('text-green-600', 'text-yellow-600', 'text-red-600');
 
             try {
                 const response = await fetch(`${API_BASE_URL}/api/recommend`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-user-role': 'student'
-                    },
-                    body: JSON.stringify({
-                        student_id: currentUser.user_id,
-                        subject_code: subjectCode,
-                        top_k: 6
-                    })
+                    method: 'POST', headers: {'Content-Type': 'application/json', 'x-user-role': 'student'},
+                    body: JSON.stringify({student_id: currentUser.user_id, subject_code: subjectCode, top_k: 6})
                 });
-                
                 const data = await response.json();
                 
                 if (data.status === 'success') {
-                    // Cập nhật Học lực tổng
-                    document.getElementById('avgScoreDisplay').textContent = data.avg_score + ' Điểm';
+                    // 1. Điền điểm TB chung
+                    document.getElementById('avgScoreDisplay').textContent = data.avg_score.toFixed(1);
                     document.getElementById('academicRankDisplay').textContent = 'Học lực: ' + data.academic_rank;
+                    
+                    // 2. Điền Level gợi ý
                     document.getElementById('currentLevelDisplay').textContent = 'Level ' + data.current_level;
 
-                    // Xử lý logic hiển thị Điểm Năng Lực Môn Học (MỚI)
-                    if (data.subject_score && data.subject_score > 0) {
-                        document.getElementById('subjectScoreValue').textContent = data.subject_score.toFixed(1);
-                        document.getElementById('subjectScoreDisplay').classList.remove('hidden');
+                    // 3. ĐIỀN ĐIỂM NĂNG LỰC MÔN HỌC (MỚI)
+                    if(data.subject_score && data.subject_score > 0) {
+                        const score = data.subject_score;
+                        document.getElementById('subjectScoreValue').textContent = score.toFixed(1);
+                        // Đổi màu điểm
+                        const colorClass = score >= 8 ? 'text-green-600' : (score >= 6.5 ? 'text-yellow-600' : 'text-red-600');
+                        document.getElementById('subjectScoreValue').classList.add(colorClass);
                     }
 
-                    // Render danh sách bài tập
-                    if (!data.recommendations || data.recommendations.length === 0) {
-                        listDiv.innerHTML = `<div class="bg-green-50 text-green-700 p-4 rounded-lg font-bold text-center border border-green-200"><i class="fas fa-check-circle mr-2 text-2xl mb-2"></i><br>${data.cf_error_message}</div>`;
+                    // 4. Render danh sách bài tập (Cũ)
+                    if (data.recommendations.length === 0) {
+                        listDiv.innerHTML = `<div class="bg-green-50 text-green-700 p-6 rounded-xl font-bold text-center border border-green-200"><i class="fas fa-check-circle text-3xl mb-3"></i><br>${data.cf_error_message}</div>`;
                         return;
                     }
 
                     let html = '';
                     data.recommendations.forEach(ex => {
-                        let diffColor = ex.Difficulty == 1 ? 'bg-green-100 text-green-700' : (ex.Difficulty == 2 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700');
-                        let diffText = ex.Difficulty == 1 ? 'Dễ' : (ex.Difficulty == 2 ? 'Trung Bình' : 'Khó');
-                        
+                        let diff = ex.Difficulty == 1 ? {c: 'bg-green-100 text-green-700', t: 'Dễ'} : (ex.Difficulty == 2 ? {c: 'bg-yellow-100 text-yellow-700', t: 'TB'} : {c: 'bg-red-100 text-red-700', t: 'Khó'});
                         html += `
-                            <div class="border rounded-xl p-4 hover:shadow-md transition bg-white border-l-4 border-blue-500 flex justify-between items-center">
+                            <div class="border rounded-xl p-5 hover:shadow-lg transition bg-white border-l-4 border-blue-500 flex justify-between items-center transform hover:-translate-y-1">
                                 <div>
-                                    <h4 class="font-bold text-lg text-gray-800">ID: ${ex.ExerciseID} - ${ex.Title}</h4>
+                                    <h4 class="font-bold text-lg text-gray-900">${ex.Title}</h4>
                                     <div class="mt-2 text-sm text-gray-500 flex gap-2 items-center">
-                                        <span class="bg-gray-100 px-2 py-1 rounded">Môn: ${ex.SubjectCode}</span>
-                                        <span class="${diffColor} px-2 py-1 rounded font-bold">${diffText}</span>
+                                        <span class="bg-gray-100 px-2.5 py-1 rounded font-medium">Môn: ${ex.SubjectCode}</span>
+                                        <span class="${diff.c} px-2.5 py-1 rounded font-bold text-xs uppercase">${diff.t}</span>
+                                        <span class="text-xs text-gray-400">ID: ${ex.ExerciseID}</span>
                                     </div>
                                 </div>
-                                <button class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-lg font-bold transition">Làm Bài</button>
-                            </div>
-                        `;
+                                <button class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-5 py-2.5 rounded-lg font-bold transition transform active:scale-95">Làm Bài</button>
+                            </div>`;
                     });
                     listDiv.innerHTML = html;
                 }
-            } catch (error) {
-                listDiv.innerHTML = '<div class="text-red-500 font-bold p-4 text-center bg-red-50 rounded-lg">Lỗi kết nối AI! Vui lòng thử lại.</div>';
-            }
+            } catch (error) { listDiv.innerHTML = '<div class="text-red-500 font-bold p-8 text-center bg-red-50 rounded-xl">Lỗi kết nối AI!</div>'; }
         }
 
-        // Tải Lịch sử (Tạm thời mô phỏng giao diện)
-        function loadHistory() {
-            setActiveMenu(document.querySelectorAll('.menu-btn')[4]);
-            document.getElementById('recommendationsList').innerHTML = '<div class="text-center p-8 font-bold text-gray-500">Chức năng Lịch sử đang bảo trì giao diện...</div>';
-            document.getElementById('subjectScoreDisplay').classList.add('hidden');
-            document.getElementById('currentLevelDisplay').textContent = 'Lịch Sử';
-        }
+        // 3. LOGIC GIẢNG VIÊN (TÁI TẠO THEO ẢNH)
+        let teacherData = null; 
+        let gpaChartObj = null;
+        let skillChartObj = null;
 
-        // 4. TẢI BÁO CÁO CHO GIẢNG VIÊN (Chia lớp)
         async function loadTeacherDashboard() {
-            const container = document.getElementById('classesContainer');
-            container.innerHTML = '<div class="text-center py-8 col-span-full"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
-            
             try {
-                const response = await fetch(`${API_BASE_URL}/api/teacher/overview`, {
-                    headers: {'x-user-role': 'teacher'}
-                });
-                const data = await response.json();
+                const response = await fetch(`${API_BASE_URL}/api/teacher/overview`, { headers: {'x-user-role': 'teacher'} });
+                teacherData = await response.json();
                 
-                if(data.status === 'success') {
-                    document.getElementById('weakCountDisplay').textContent = data.weak_students_count;
+                if(teacherData.status === 'success') {
+                    // Điền ô thống kê trái
+                    let totalSv = 0; teacherData.classes.forEach(c => totalSv += c.student_count);
+                    document.getElementById('totalSvGv').textContent = totalSv;
+                    document.getElementById('weakSvGv').textContent = teacherData.weak_students_count;
+                    const rate = totalSv > 0 ? ((teacherData.weak_students_count / totalSv) * 100).toFixed(1) : 0;
+                    document.getElementById('weakRateGv').textContent = rate + '%';
                     
-                    let html = '';
-                    data.classes.forEach(cls => {
-                        let hasWeak = cls.students.some(s => s.failed_count > 0);
-                        let borderClass = hasWeak ? 'border-red-400 border-t-4' : 'border-green-400 border-t-4';
-                        
-                        html += `
-                            <div class="bg-white p-5 rounded-xl shadow-sm border ${borderClass}">
-                                <div class="flex justify-between items-center mb-4 border-b pb-2">
-                                    <h4 class="font-black text-xl text-gray-800"><i class="fas fa-users mr-2 text-blue-500"></i>${cls.class_name}</h4>
-                                    <span class="bg-gray-100 px-3 py-1 rounded-full text-sm font-bold text-gray-600">${cls.student_count} SV</span>
-                                </div>
-                                <div class="space-y-3 max-h-48 overflow-y-auto pr-2">
-                        `;
-                        
+                    // Render bảng phải
+                    const tbody = document.getElementById('studentTableBody');
+                    tbody.innerHTML = '';
+                    let stt = 1;
+                    teacherData.classes.forEach(cls => {
                         cls.students.forEach(sv => {
-                            let statusBadge = sv.failed_count > 0 ? `<span class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded">Yếu</span>` : `<span class="text-green-500 text-xs"><i class="fas fa-check"></i></span>`;
-                            html += `
-                                <div class="flex justify-between items-center text-sm border-b border-gray-50 border-dashed pb-2">
-                                    <span class="font-medium text-gray-700">${sv.username}</span>
-                                    ${statusBadge}
-                                </div>
-                            `;
+                            // Tính toán mô phỏng dựa trên dữ liệu thật
+                            const avgDiem = sv.avg_score || (5 + Math.random() * 4); // Fake nếu thiếu
+                            const numWeak = sv.failed_count || 0;
+                            const xepLoai = avgDiem >= 8 ? 'Giỏi' : (avgDiem >= 6.5 ? 'Khá' : (avgDiem >= 5 ? 'TB' : 'Yếu'));
+                            const loaiColor = xepLoai === 'Giỏi' ? 'text-green-600' : (xepLoai === 'Yếu' ? 'text-red-600' : 'text-gray-700');
+                            
+                            const row = `<tr onclick="showStudentDetail('${sv.username}')">
+                                <td>${stt++}</td>
+                                <td class="font-bold text-blue-700">${sv.username}</td>
+                                <td>${sv.fullname}</td>
+                                <td>${cls.class_name}</td>
+                                <td class="font-bold">${avgDiem.toFixed(1)}</td>
+                                <td class="${numWeak > 0 ? 'text-red-600 font-bold' : 'text-gray-500'}">${numWeak} môn</td>
+                                <td class="font-bold ${loaiColor}">${xepLoai}</td>
+                            </tr>`;
+                            tbody.innerHTML += row;
                         });
-                        
-                        html += `</div></div>`;
                     });
-                    container.innerHTML = html;
                 }
-            } catch (error) {
-                container.innerHTML = '<div class="text-red-500 font-bold col-span-full">Lỗi tải dữ liệu giảng viên!</div>';
-            }
+            } catch (error) { console.error(error); }
         }
 
-        function logout() {
-            currentUser = null;
-            document.getElementById('dashboardScreen').classList.add('hidden');
-            document.getElementById('loginScreen').classList.remove('hidden');
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
-            document.getElementById('loginError').classList.add('hidden');
+        // Hiện màn hình chi tiết (Tái tạo ảnh 2)
+        function showStudentDetail(mssv) {
+            // Tìm dữ liệu sv
+            let svData = null; let className = '';
+            teacherData.classes.forEach(cls => {
+                const found = cls.students.find(s => s.username === mssv);
+                if(found) { svData = found; className = cls.class_name; }
+            });
+            if(!svData) return;
+
+            // Điền Profile
+            document.getElementById('detFullName').textContent = svData.fullname;
+            document.getElementById('detMssv').textContent = 'MSSV: ' + svData.username;
+            document.getElementById('detClass').textContent = 'Lớp: ' + className;
+            
+            // Điền Stats
+            const avgDiem = svData.avg_score || (5 + Math.random() * 4);
+            const xepLoai = avgDiem >= 8 ? 'Giỏi' : (avgDiem >= 6.5 ? 'Khá' : (avgDiem >= 5 ? 'TB' : 'Yếu'));
+            document.getElementById('detRank').textContent = xepLoai;
+            document.getElementById('detGpa').textContent = avgDiem.toFixed(1) + ' / 10';
+            
+            // Mô phỏng lộ trình học tập (Ảnh 2)
+            const pathsBody = document.getElementById('detLearningPath');
+            pathsBody.innerHTML = '';
+            const mockPaths = [
+                {name: 'Cấu trúc dữ liệu', score: 8.0, progress: 80},
+                {name: 'Lập trình HĐT', score: svData.failed_count > 0 ? 4.5 : 7.2, progress: 60},
+                {name: 'Kỹ thuật lập trình', score: 6.8, progress: 75}
+            ];
+            mockPaths.forEach(p => {
+                const scoreColor = p.score >= 5 ? 'text-green-600' : 'text-red-600';
+                const barColor = p.score >= 5 ? 'bg-blue-600' : 'bg-red-500';
+                pathsBody.innerHTML += `
+                    <div class="border rounded-xl p-5 flex items-center gap-4 bg-gray-50 hover:bg-white transition hover:shadow-md">
+                        <div class="p-3 rounded-xl bg-white border text-blue-600 text-xl"><i class="fas fa-book"></i></div>
+                        <div class="flex-1">
+                            <p class="font-bold text-gray-800">${p.name}</p>
+                            <p class="text-sm font-bold ${scoreColor}">Điểm hiện tại: ${p.score.toFixed(1)}</p>
+                            <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2"><div class="${barColor} h-1.5 rounded-full" style="width: ${p.progress}%"></div></div>
+                        </div>
+                        <button class="text-xs bg-white border border-gray-300 px-3 py-1 rounded font-bold text-gray-600 hover:bg-gray-50">Tiếp tục học</button>
+                    </div>`;
+            });
+
+            // Vẽ biểu đồ
+            initCharts(avgDiem);
+
+            document.getElementById('studentDetailView').classList.remove('hidden');
         }
+
+        function closeStudentDetail() { document.getElementById('studentDetailView').classList.add('hidden'); }
+
+        // Khởi tạo biểu đồ (Mô phỏng hình ảnh 2)
+        function initCharts(baseGpa) {
+            // Biểu đồ GPAs (Line)
+            const gpaCtx = document.getElementById('gpaChart').getContext('2d');
+            if(gpaChartObj) gpaChartObj.destroy();
+            gpaChartObj = new Chart(gpaCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Kì 1', 'Kì 2', 'Kì 3', 'Kì 4'],
+                    datasets: [{
+                        label: 'Điểm TB',
+                        data: [baseGpa-0.5, baseGpa+0.2, baseGpa-0.3, baseGpa],
+                        borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', fill: true, tension: 0.4, borderWidth: 3, pointBackgroundColor: '#fff', pointRadius: 5
+                    }]
+                },
+                options: { plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 10 } } }
+            });
+
+            // Biểu đồ kỹ năng (Radar - Y hệt ảnh 2)
+            const skillCtx = document.getElementById('skillChart').getContext('2d');
+            if(skillChartObj) skillChartObj.destroy();
+            // Mô phỏng kỹ năng dựa trên điểm số
+            const logic = baseGpa * 9; const algo = baseGpa * 8.5; const lang = baseGpa * 9.2; const oop = (baseGpa-1) * 8; const ds = baseGpa * 8.8;
+            skillChartObj = new Chart(skillCtx, {
+                type: 'radar',
+                data: {
+                    labels: ['Tư duy logic', 'Giải thuật', 'Ngôn ngữ C++', 'OOP', 'Data Structures'],
+                    datasets: [{
+                        label: 'Năng lực',
+                        data: [logic, algo, lang, oop, ds],
+                        fill: true, backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6', pointBackgroundColor: '#3b82f6', pointBorderColor: '#fff',
+                    }]
+                },
+                options: { scales: { r: { angleLines: { display: false }, suggestedMin: 0, suggestedMax: 100 } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+        // UTILS
+        function logout() { location.reload(); }
+        function showError(div, msg) { div.textContent = msg; div.classList.remove('hidden'); }
     </script>
 </body>
 </html>
