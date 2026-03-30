@@ -135,45 +135,38 @@
                 <div class="flex justify-between items-center">
                     <h2 class="text-3xl font-black text-gray-800">Quản lý lớp học</h2>
                     <div class="flex space-x-3">
-                        <select class="bg-white border rounded-lg px-4 py-2 font-medium text-gray-700 shadow-sm"><option>Niên khóa: 2022-2023</option></select>
-                        <select class="bg-white border rounded-lg px-4 py-2 font-medium text-gray-700 shadow-sm"><option>Lớp: Tất cả</option></select>
+                        <select id="yearFilter" class="bg-white border rounded-lg px-4 py-2 font-medium text-gray-700 shadow-sm pointer-events-none bg-gray-50">
+                            <option value="all">Tất cả niên khóa</option>
+                            <option value="2022">2022-2026</option>
+                            <option value="2023">2023-2027</option>
+                            <option value="2024">2024-2028</option>
+                        </select>
+                        <select id="classFilter" onchange="onClassFilterChange()" class="bg-white border rounded-lg px-4 py-2 font-medium text-blue-700 shadow-sm cursor-pointer border-blue-300">
+                            <option value="all">Tất cả các lớp</option>
+                            </select>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-8 items-start">
-                    <div class="col-span-12 lg:col-span-4 space-y-6">
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
-                            <div class="flex items-center gap-4 border-b pb-4">
+                    <div class="col-span-12 lg:col-span-3 space-y-6">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4 hover:shadow-md transition cursor-pointer" onclick="renderTeacherRightPanel('grid', 'all')">
+                            <div class="flex items-center gap-4">
                                 <div class="p-4 rounded-xl bg-blue-50 text-blue-600 text-2xl"><i class="fas fa-users"></i></div>
                                 <div><p class="text-sm font-bold text-gray-500">Tổng số sinh viên</p><p class="text-3xl font-black text-gray-800" id="totalSvGv">0</p></div>
                             </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-red-100 hover:border-red-400 hover:shadow-md transition cursor-pointer group" onclick="renderTeacherRightPanel('weak')">
                             <div class="flex items-center gap-4">
-                                <div class="p-4 rounded-xl bg-red-50 text-red-600 text-2xl"><i class="fas fa-user-slash"></i></div>
+                                <div class="p-4 rounded-xl bg-red-50 text-red-600 text-2xl group-hover:bg-red-600 group-hover:text-white transition"><i class="fas fa-user-slash"></i></div>
                                 <div><p class="text-sm font-bold text-gray-500">Sinh viên yếu</p><p class="text-3xl font-black text-red-600" id="weakSvGv">0</p></div>
                                 <div class="ml-auto bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-bold" id="weakRateGv">0%</div>
                             </div>
-                        </div>
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                            <input type="text" placeholder="Tìm MSSV/Họ tên..." class="w-full px-4 py-2.5 border rounded-lg mb-4">
-                            <div class="flex flex-wrap gap-2">
-                                <button class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm font-medium">Tất cả</button>
-                                <button class="bg-gray-100 text-gray-700 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-gray-200">Khá giỏi</button>
-                                <button class="bg-gray-100 text-gray-700 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-red-50 hover:text-red-700">Yếu</button>
-                            </div>
+                            <p class="text-xs text-gray-400 mt-3 text-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-hand-pointer mr-1"></i>Bấm để xem danh sách</p>
                         </div>
                     </div>
 
-                    <div class="col-span-12 lg:col-span-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                        <table class="w-full gv-table">
-                            <thead>
-                                <tr class="text-sm text-gray-500">
-                                    <th>MSSV</th><th>Họ tên</th><th>Lớp</th><th>ĐTB</th><th>Số môn yếu</th><th>Xếp loại</th>
-                                </tr>
-                            </thead>
-                            <tbody id="studentTableBody" class="text-sm font-medium text-gray-800">
-                                </tbody>
-                        </table>
-                    </div>
+                    <div id="gvRightContent" class="col-span-12 lg:col-span-9">
+                        </div>
                 </div>
 
                 <div id="studentDetailView" class="hidden fixed inset-0 bg-gray-50 z-[100] overflow-y-auto p-8 space-y-8">
@@ -287,7 +280,17 @@
         const subjectNames = {"CTDLGT": "Cấu trúc dữ liệu", "OOP": "Lập trình HĐT", "NMLT": "Nhập môn lập trình", "KTLT": "Kỹ thuật lập trình"};
         let activeExerciseId = null;
 
-        // 1. ĐĂNG NHẬP
+        // --- CÔNG CỤ TẠO ĐIỂM CỐ ĐỊNH CHO TỪNG SINH VIÊN ---
+        // Giúp điểm không bị nhảy lung tung khi click
+        function getStableScore(username) {
+            let hash = 0;
+            for (let i = 0; i < username.length; i++) {
+                hash = username.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            let pseudoRandom = Math.abs(Math.sin(hash)); 
+            return 5.0 + (pseudoRandom * 4.9); 
+        }
+
         async function login() {
             const userIn = document.getElementById('username').value;
             const passIn = document.getElementById('password').value;
@@ -324,7 +327,7 @@
             }
         }
 
-        // ================= SINH VIÊN =================
+        // ================= SINH VIÊN (GIỮ NGUYÊN) =================
         async function loadSubject(subjectCode, btnElement) {
             document.getElementById('historyView').classList.add('hidden');
             document.getElementById('subjectView').classList.remove('hidden');
@@ -362,7 +365,6 @@
                         return;
                     }
 
-                    // TỐI ƯU HÓA: Dùng mảng và join để render nhanh hơn 10 lần
                     let htmlArr = data.recommendations.map(ex => {
                         let diff = ex.Difficulty == 1 ? {c: 'bg-green-100 text-green-700', t: 'Dễ'} : (ex.Difficulty == 2 ? {c: 'bg-yellow-100 text-yellow-700', t: 'TB'} : {c: 'bg-red-100 text-red-700', t: 'Khó'});
                         return `
@@ -378,7 +380,7 @@
                                 <button onclick="openExerciseModal(${ex.ExerciseID}, '${ex.Title.replace(/'/g, "\\'")}', '${ex.SubjectCode}', '${diff.t}')" class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-lg font-bold transition">Làm Bài</button>
                             </div>`;
                     });
-                    listDiv.innerHTML = htmlArr.join(''); // Chỉ gán DOM 1 lần duy nhất!
+                    listDiv.innerHTML = htmlArr.join('');
                 }
             } catch (error) { listDiv.innerHTML = '<div class="text-red-500 font-bold p-8 text-center bg-red-50 rounded-xl">Lỗi kết nối AI!</div>'; }
         }
@@ -404,7 +406,6 @@
                         return;
                     }
                     
-                    // TỐI ƯU HÓA: Buffering HTML
                     let rowsHtml = data.history.map(item => {
                         let diffText = item.Difficulty == 1 ? 'Dễ' : (item.Difficulty == 2 ? 'TB' : 'Khó');
                         let statusHtml = item.Score >= 5.0 ? '<span class="text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>Đạt</span>' : '<span class="text-red-600 font-bold"><i class="fas fa-times-circle mr-1"></i>Chưa Đạt</span>';
@@ -418,7 +419,7 @@
                                 <td>${statusHtml}</td>
                             </tr>`;
                     }).join('');
-                    tbody.innerHTML = rowsHtml; // Load cực mượt!
+                    tbody.innerHTML = rowsHtml;
                 }
             } catch (error) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-red-500 font-bold">Lỗi tải dữ liệu lịch sử!</td></tr>'; }
         }
@@ -481,7 +482,7 @@
             } catch(e) { alert("Lỗi khi nộp bài!"); btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Nộp Lại'; }
         }
 
-        // ================= GIẢNG VIÊN (ĐÃ TỐI ƯU HÓA HIỆU SUẤT TRÁNH ĐƠ TRÌNH DUYỆT) =================
+        // ================= GIẢNG VIÊN (ĐÃ NÂNG CẤP CHIA KHUNG LỚP & BỘ LỌC) =================
         let teacherData = null; 
         let gpaChartObj = null;
         let skillChartObj = null;
@@ -492,45 +493,128 @@
                 teacherData = await response.json();
                 
                 if(teacherData.status === 'success') {
-                    let totalSv = 0; teacherData.classes.forEach(c => totalSv += c.student_count);
+                    let totalSv = 0; 
+                    const classSelect = document.getElementById('classFilter');
+                    classSelect.innerHTML = '<option value="all">Tất cả các lớp</option>';
+
+                    teacherData.classes.forEach(c => {
+                        totalSv += c.student_count;
+                        classSelect.innerHTML += `<option value="${c.class_name}">${c.class_name}</option>`;
+                        // Tính điểm cố định ngay từ đầu để dùng nhiều lần
+                        c.students.forEach(sv => {
+                            sv.stable_score = sv.avg_score || getStableScore(sv.username);
+                            sv.xep_loai = sv.stable_score >= 8 ? 'Giỏi' : (sv.stable_score >= 6.5 ? 'Khá' : (sv.stable_score >= 5 ? 'TB' : 'Yếu'));
+                        });
+                    });
+
                     document.getElementById('totalSvGv').textContent = totalSv;
                     document.getElementById('weakSvGv').textContent = teacherData.weak_students_count;
                     const rate = totalSv > 0 ? ((teacherData.weak_students_count / totalSv) * 100).toFixed(1) : 0;
                     document.getElementById('weakRateGv').textContent = rate + '%';
                     
-                    const tbody = document.getElementById('studentTableBody');
-                    
-                    // TỐI ƯU HÓA ĐỈNH CAO: Không dùng innerHTML trong vòng lặp!
-                    let gvRowsHtml = '';
-                    teacherData.classes.forEach(cls => {
-                        cls.students.forEach(sv => {
-                            const avgDiem = sv.avg_score || (5 + Math.random() * 4); 
-                            const numWeak = sv.failed_count || 0;
-                            const xepLoai = avgDiem >= 8 ? 'Giỏi' : (avgDiem >= 6.5 ? 'Khá' : (avgDiem >= 5 ? 'TB' : 'Yếu'));
-                            const loaiColor = xepLoai === 'Giỏi' ? 'text-green-600' : (xepLoai === 'Yếu' ? 'text-red-600' : 'text-gray-700');
-                            
-                            gvRowsHtml += `<tr onclick="showStudentDetail('${sv.username}')">
-                                <td class="font-bold text-blue-700">${sv.username}</td>
-                                <td>${sv.fullname}</td>
-                                <td>${cls.class_name}</td>
-                                <td class="font-bold">${avgDiem.toFixed(1)}</td>
-                                <td class="${numWeak > 0 ? 'text-red-600 font-bold' : 'text-gray-500'}">${numWeak} môn</td>
-                                <td class="font-bold ${loaiColor}">${xepLoai}</td>
-                            </tr>`;
-                        });
-                    });
-                    
-                    // Chỉ nạp DOM 1 lần duy nhất để trình duyệt không bị treo
-                    tbody.innerHTML = gvRowsHtml; 
+                    // Mặc định load dạng Khung Lớp
+                    renderTeacherRightPanel('grid', 'all');
                 }
             } catch (error) { console.error(error); }
         }
 
-        function showStudentDetail(mssv) {
-            let svData = null; let className = '';
+        // Xử lý khi chọn Lớp -> Tự động nhảy Niên khóa
+        function onClassFilterChange() {
+            const cls = document.getElementById('classFilter').value;
+            const yearFilter = document.getElementById('yearFilter');
+            
+            if(cls === 'all') {
+                yearFilter.value = 'all';
+                renderTeacherRightPanel('grid', 'all');
+            } else {
+                // Tự động nhận diện niên khóa (VD: 22CT1 -> 2022)
+                const prefix = cls.substring(0, 2);
+                yearFilter.value = "20" + prefix;
+                renderTeacherRightPanel('grid', cls);
+            }
+        }
+
+        // Hàm render giao diện động (Khung lớp HOẶC Bảng SV yếu)
+        function renderTeacherRightPanel(mode = 'grid', filterValue = 'all') {
+            const container = document.getElementById('gvRightContent');
+            
+            if (mode === 'grid') {
+                // Giao diện Khung Lớp (Dạng Card)
+                let html = '<div class="grid grid-cols-1 xl:grid-cols-2 gap-6 w-full">';
+                teacherData.classes.forEach(cls => {
+                    if (filterValue !== 'all' && cls.class_name !== filterValue) return;
+
+                    let hasWeak = cls.students.some(s => s.failed_count > 0);
+                    let borderColor = hasWeak ? 'border-red-400' : 'border-green-400';
+                    let headerColor = hasWeak ? 'text-red-700' : 'text-blue-700';
+
+                    html += `
+                    <div class="bg-white rounded-2xl border-t-4 ${borderColor} p-5 shadow-sm flex flex-col h-80">
+                        <div class="flex justify-between items-center border-b border-gray-100 pb-3 mb-3">
+                            <h4 class="font-black text-xl ${headerColor}"><i class="fas fa-users mr-2"></i>${cls.class_name}</h4>
+                            <span class="bg-gray-100 px-3 py-1 rounded-full text-sm font-bold text-gray-600">${cls.students.length} SV</span>
+                        </div>
+                        <div class="overflow-y-auto flex-1 pr-2 space-y-2">`;
+                    
+                    cls.students.forEach(sv => {
+                        let statusIcon = sv.failed_count > 0 ? '<i class="fas fa-exclamation-triangle text-red-500"></i>' : '<i class="fas fa-check text-green-500"></i>';
+                        html += `
+                            <div class="flex justify-between items-center p-3 rounded-lg border border-gray-50 hover:bg-blue-50 hover:border-blue-200 cursor-pointer transition" onclick="showStudentDetail('${sv.username}', '${cls.class_name}')">
+                                <div>
+                                    <p class="font-bold text-gray-800 text-sm">${sv.username}</p>
+                                    <p class="text-xs text-gray-500">${sv.fullname}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-sm text-gray-700">${sv.stable_score.toFixed(1)}</p>
+                                    ${statusIcon}
+                                </div>
+                            </div>`;
+                    });
+                    html += `</div></div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            } 
+            else if (mode === 'weak') {
+                // Giao diện Bảng chi tiết cho Sinh viên yếu (Có cột Lớp)
+                let html = `
+                <div class="bg-white rounded-2xl shadow-sm border border-red-200 overflow-hidden">
+                    <div class="bg-red-50 px-6 py-4 border-b border-red-100">
+                        <h3 class="font-black text-red-700 text-lg"><i class="fas fa-filter mr-2"></i>Danh sách Sinh viên có nguy cơ</h3>
+                    </div>
+                    <table class="w-full gv-table">
+                        <thead class="bg-white">
+                            <tr class="text-sm text-gray-500 uppercase">
+                                <th>MSSV</th><th>Họ tên</th><th>Lớp</th><th>ĐTB</th><th>Môn Yếu</th><th>Xếp loại</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm font-medium text-gray-800">`;
+                
+                teacherData.classes.forEach(cls => {
+                    cls.students.forEach(sv => {
+                        if (sv.failed_count > 0) {
+                            html += `
+                            <tr onclick="showStudentDetail('${sv.username}', '${cls.class_name}')">
+                                <td class="font-bold text-red-600">${sv.username}</td>
+                                <td>${sv.fullname}</td>
+                                <td class="font-bold bg-gray-50">${cls.class_name}</td>
+                                <td class="font-bold">${sv.stable_score.toFixed(1)}</td>
+                                <td class="text-red-600 font-bold">${sv.failed_count} môn</td>
+                                <td class="font-bold text-red-600">${sv.xep_loai}</td>
+                            </tr>`;
+                        }
+                    });
+                });
+                html += `</tbody></table></div>`;
+                container.innerHTML = html;
+            }
+        }
+
+        function showStudentDetail(mssv, className) {
+            let svData = null;
             teacherData.classes.forEach(cls => {
                 const found = cls.students.find(s => s.username === mssv);
-                if(found) { svData = found; className = cls.class_name; }
+                if(found) svData = found;
             });
             if(!svData) return;
 
@@ -538,10 +622,8 @@
             document.getElementById('detMssv').textContent = 'MSSV: ' + svData.username;
             document.getElementById('detClass').textContent = 'Lớp: ' + className;
             
-            const avgDiem = svData.avg_score || (5 + Math.random() * 4);
-            const xepLoai = avgDiem >= 8 ? 'Giỏi' : (avgDiem >= 6.5 ? 'Khá' : (avgDiem >= 5 ? 'TB' : 'Yếu'));
-            document.getElementById('detRank').textContent = xepLoai;
-            document.getElementById('detGpa').textContent = avgDiem.toFixed(1) + ' / 10';
+            document.getElementById('detRank').textContent = svData.xep_loai;
+            document.getElementById('detGpa').textContent = svData.stable_score.toFixed(1) + ' / 10';
             
             const pathsBody = document.getElementById('detLearningPath');
             const mockPaths = [
@@ -550,7 +632,6 @@
                 {name: 'Kỹ thuật lập trình', score: 6.8, progress: 75}
             ];
             
-            // Tối ưu hóa render lộ trình học tập GV
             pathsBody.innerHTML = mockPaths.map(p => {
                 const scoreColor = p.score >= 5 ? 'text-green-600' : 'text-red-600';
                 const barColor = p.score >= 5 ? 'bg-blue-600' : 'bg-red-500';
@@ -562,11 +643,10 @@
                             <p class="text-sm font-bold ${scoreColor}">Điểm hiện tại: ${p.score.toFixed(1)}</p>
                             <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2"><div class="${barColor} h-1.5 rounded-full" style="width: ${p.progress}%"></div></div>
                         </div>
-                        <button class="text-xs bg-white border border-gray-300 px-3 py-1 rounded font-bold text-gray-600 hover:bg-gray-50">Tiếp tục học</button>
                     </div>`;
             }).join('');
 
-            initCharts(avgDiem);
+            initCharts(svData.stable_score);
             document.getElementById('studentDetailView').classList.remove('hidden');
         }
 
