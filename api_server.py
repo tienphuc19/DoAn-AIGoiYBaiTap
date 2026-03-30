@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 # Tải các biến môi trường từ file .env
 load_dotenv()
 
-app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập - Hoàn Thiện")
+app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập - Tối Ưu Phân Tầng Năng Lực")
 
 app.add_middleware(
     CORSMiddleware,
@@ -93,6 +93,7 @@ def mock_grade_and_submit_result(request: MockGradeRequest, x_user_role: str = H
     if x_user_role != "student": raise HTTPException(status_code=403, detail="Cấm truy cập!")
     try:
         conn = get_db_connection()
+        # Mô phỏng AI chấm điểm từ 3.0 đến 9.5
         final_grade = round(random.uniform(3.0, 9.5), 1) 
         query_upsert = text("""
             IF EXISTS (SELECT 1 FROM AI_LichSuLamBai WHERE MaSinhVien = :sv_id AND MaBaiTap = :ex_id)
@@ -107,7 +108,7 @@ def mock_grade_and_submit_result(request: MockGradeRequest, x_user_role: str = H
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
 # ==========================================
-# API LÕI: GỢI Ý BÀI TẬP (CONTENT-BASED FILTERING CHUẨN MỰC)
+# API LÕI: GỢI Ý BÀI TẬP (CONTENT-BASED + PHÂN TẦNG MASTERY)
 # ==========================================
 class RecommendRequest(BaseModel):
     student_id: int
@@ -122,11 +123,10 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     academic_rank = "Chưa có điểm"
     course_score = 0.0 
     
-    # 1. GIAO TIẾP VỚI SUPABASE (Lấy điểm hiển thị và điểm nền)
+    # 1. GIAO TIẾP VỚI SUPABASE (Lấy điểm nền)
     supa_key = os.getenv("SUPABASE_KEY")
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
-        
         try:
             res_int = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
             if res_int.status_code == 200 and len(res_int.json()) > 0:
@@ -154,20 +154,29 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     if df_exercises.empty: 
         return {"status": "success", "cf_error_message": "Chưa có dữ liệu bài tập trong SQL.", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "recommendations": []}
 
-    all_attempts_ids = student_history['ExerciseID'].tolist()
+    # BƯỚC NGOẶT: Chia làm 2 danh sách rõ ràng (Hoàn thành vs Thành thạo)
     
-    # Lấy các bài đã qua môn (điểm >= 5.0) và khớp mã bài với môn học hiện tại
-    passed_exercises_ids = student_history[
+    # Danh sách 1: Các bài đạt >= 5.0 (Dùng để VỨT KHỎI AI - không bắt làm lại)
+    # Ngược lại, những bài < 5.0 sẽ VẪN CÒN trong danh sách để được gợi ý lại (Retry)
+    completed_exercises_ids = student_history[
         (student_history['Score'] >= 5.0) & 
         (student_history['ExerciseID'].isin(df_exercises['ExerciseID']))
     ]['ExerciseID'].tolist()
     
-    # 3. LOGIC CÁ NHÂN HÓA TRÌNH ĐỘ (DYNAMIC LEVEL)
+    # Danh sách 2: Các bài đạt >= 8.0 (Thành thạo - Dùng để KÉO LEVEL LÊN)
+    mastered_exercises_ids = student_history[
+        (student_history['Score'] >= 8.0) & 
+        (student_history['ExerciseID'].isin(df_exercises['ExerciseID']))
+    ]['ExerciseID'].tolist()
+    
+    # 3. LOGIC CÁ NHÂN HÓA TRÌNH ĐỘ (DYNAMIC LEVEL TỪ MỨC THÀNH THẠO)
     str_student_id = str(request.student_id)
     
-    if passed_exercises_ids:
-        current_level = df_exercises[df_exercises['ExerciseID'].isin(passed_exercises_ids)]['Difficulty'].max()
+    # Tính Level dựa trên những bài đã đạt từ 8.0 trở lên
+    if mastered_exercises_ids:
+        current_level = df_exercises[df_exercises['ExerciseID'].isin(mastered_exercises_ids)]['Difficulty'].max()
     else:
+        # Nếu chưa Master bài nào (chỉ lẹt đẹt 5-7 điểm) hoặc Cold Start
         if str_student_id.startswith("125"):
             current_level = 1
         else:
@@ -177,16 +186,18 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
 
     if pd.isna(current_level): current_level = 1
 
-    candidate_exercises = df_exercises[(~df_exercises['ExerciseID'].isin(all_attempts_ids))]
+    # Lọc danh sách Ứng viên: Bỏ đi những bài ĐÃ HOÀN THÀNH (>=5.0)
+    candidate_exercises = df_exercises[(~df_exercises['ExerciseID'].isin(completed_exercises_ids))]
     if candidate_exercises.empty: 
         return {"status": "success", "cf_error_message": "Tuyệt vời! Bạn đã hoàn thành toàn bộ bài tập môn này.", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "recommendations": []}
 
-    # 4. THUẬT TOÁN CONTENT-BASED FILTERING (ĐÃ TỐI ƯU HÓA)
+    # 4. THUẬT TOÁN CONTENT-BASED FILTERING
     tfidf = TfidfVectorizer()
     tfidf_matrix = tfidf.fit_transform(df_exercises['Tags'])
     cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
     
-    passed_indices = df_exercises[df_exercises['ExerciseID'].isin(passed_exercises_ids)].index.tolist()
+    # So khớp nội dung dựa trên các bài ĐÃ THÀNH THẠO (>= 8.0)
+    passed_indices = df_exercises[df_exercises['ExerciseID'].isin(mastered_exercises_ids)].index.tolist()
     
     final_recommendations_with_score = []
     if passed_indices:
