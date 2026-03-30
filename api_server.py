@@ -194,9 +194,9 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     
     passed_indices = df_exercises[df_exercises['ExerciseID'].isin(passed_exercises_ids)].index.tolist()
     
-    final_recommendations_with_score = []
+   final_recommendations_with_score = []
     if passed_indices:
-        # Tính độ tương đồng với các bài đã giải
+        # TRƯỜNG HỢP 1: ĐÃ CÓ LỊCH SỬ LÀM BÀI
         sim_scores_cb = sum([cosine_sim[i] for i in passed_indices])
         if type(sim_scores_cb) != list and sim_scores_cb.max() > sim_scores_cb.min():
             sim_scores_cb = (sim_scores_cb - sim_scores_cb.min()) / (sim_scores_cb.max() - sim_scores_cb.min())
@@ -204,25 +204,39 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
         cb_scores_dict = {df_exercises.iloc[idx]['ExerciseID']: sim_scores_cb[idx] for idx in df_exercises.index}
         
         for _, row in candidate_exercises.iterrows():
-            cb_score = cb_scores_dict.get(row['ExerciseID'], 0)
-            final_recommendations_with_score.append({"exercise": row.to_dict(), "final_score": float(cb_score)})
+            sim_score = cb_scores_dict.get(row['ExerciseID'], 0)
+            
+            # 1. Phạt điểm nếu bài quá lệch so với Level (Ép AI chọn bài đúng trình độ)
+            diff_penalty = abs(row['Difficulty'] - current_level) * 0.3 
+            
+            # 2. Cộng hệ số Random (0.01 -> 0.15) để phá Bong bóng lọc, tăng đa dạng
+            diversity_bonus = random.uniform(0.01, 0.15) 
+            
+            final_score = sim_score - diff_penalty + diversity_bonus
+            final_recommendations_with_score.append({"exercise": row.to_dict(), "final_score": float(final_score)})
     else:
-        # Nếu chưa làm bài nào, ưu tiên bài dễ trong list Candidate
+        # TRƯỜNG HỢP 2: CHƯA CÓ LỊCH SỬ (GIẢI QUYẾT LỖI TOÀN BÀI DỄ)
         for _, row in candidate_exercises.iterrows():
-            final_recommendations_with_score.append({"exercise": row.to_dict(), "final_score": float(1.0 / (row['Difficulty'] + 1))})
+            # Chấm điểm cao nhất cho bài tập có Độ khó KHỚP với Level hiện tại
+            diff_match_score = 1.0 / (abs(row['Difficulty'] - current_level) + 1.0)
+            
+            # Trộn ngẫu nhiên để các dạng bài khác nhau được ngoi lên
+            diversity_bonus = random.uniform(0.01, 0.2) 
+            
+            final_score = diff_match_score + diversity_bonus
+            final_recommendations_with_score.append({"exercise": row.to_dict(), "final_score": float(final_score)})
 
-    # Sắp xếp từ điểm phù hợp cao xuống thấp
+    # Sắp xếp từ điểm cao xuống thấp và lấy Top K
     sorted_recommendations = sorted(final_recommendations_with_score, key=lambda x: x['final_score'], reverse=True)
     
-    # Trả về dữ liệu chuyên nghiệp
     return {
         "status": "success", 
         "current_level": int(current_level), 
         "avg_score": float(fixed_avg_score), 
         "academic_rank": academic_rank,
-        # TRẢ VỀ ĐIỂM MÔN HỌC (làm tròn 1 chữ số thập phân)
         "subject_score": round(float(course_score), 1), 
         "recommendations": [item['exercise'] for item in sorted_recommendations[:request.top_k]]
+    }
     }
 
 # ==========================================
