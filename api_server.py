@@ -285,4 +285,5 @@ def export_student_progress(student_id: int, x_api_key: str = Header(None, descr
 # SERVE FRONTEND (GIAO DIỆN)
 # ==========================================
 @app.get("/")
+@app.head("/")
 def serve_frontend(): return FileResponse("index.html") if os.path.exists("index.html") else {"message": "Upload index.html!"}
