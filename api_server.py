@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập ")
+app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập AI")
 
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
@@ -82,24 +82,25 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=gemini_api_key)
+                
+                # Đã dùng gemini-pro để sửa lỗi 404
                 model = genai.GenerativeModel('gemini-pro')
-                prompt = f"""Bạn là giảng viên chấm thi lập trình nghiêm khắc.
-                Hãy chấm điểm đoạn code của sinh viên.
+                prompt = f"""Bạn là giảng viên chấm thi lập trình.
+                Chấm điểm đoạn code của sinh viên.
                 - TÊN BÀI: {title}
                 - CODE SINH VIÊN:
                 {code_sinh_vien}
                 
-                TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON SAU:
+                TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON SAU (không text thừa):
                 {{
                     "score": <Điểm từ 0.0 đến 10.0>,
-                    "criteria_eval": "<Nhận xét chi tiết code có đạt yêu cầu thuật toán không. Giải thích rõ ràng.>",
+                    "criteria_eval": "<Nhận xét chi tiết code có đạt yêu cầu thuật toán không.>",
                     "strengths": "<Khen phần code viết tốt, logic đúng.>",
                     "weaknesses": "<Chỉ ra dòng code bị sai, tối ưu kém và cách sửa.>"
                 }}
                 """
-                response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
+                response = model.generate_content(prompt)
                 
-                # Bóc tách JSON cực mạnh để chống lỗi
                 raw_text = response.text.strip()
                 match = re.search(r'\{.*\}', raw_text, re.DOTALL)
                 if match:
@@ -111,16 +112,16 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
                     raise Exception("Gemini không trả về JSON hợp lệ")
                     
             except Exception as e:
-                print(f"LỖI GEMINI THỰC TẾ: {str(e)}") # In ra Terminal của Render
+                print(f"LỖI GEMINI: {str(e)}")
                 final_grade = 5.0
                 feedback = {
                     "criteria_eval": f"LỖI TỪ GOOGLE: {str(e)}",
-                    "strengths": "Hệ thống AI đang gặp sự cố kết nối.",
-                    "weaknesses": "Vui lòng xem kỹ dòng thông báo lỗi phía trên."
+                    "strengths": "AI gặp sự cố kết nối hoặc API Key sai.",
+                    "weaknesses": "Vui lòng kiểm tra lại cấu hình trên Render."
                 }
         else:
             final_grade = 0.0
-            feedback = {"criteria_eval": "Code quá ngắn hoặc không có API Key.", "strengths": "Trống", "weaknesses": "Trống"}
+            feedback = {"criteria_eval": "Code quá ngắn hoặc thiếu API Key.", "strengths": "Trống", "weaknesses": "Trống"}
 
         query_upsert = text("""
             IF EXISTS (SELECT 1 FROM AI_LichSuLamBai WHERE MaSinhVien = :sv_id AND MaBaiTap = :ex_id)
@@ -174,39 +175,58 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     if request.subject_code:
         df_exercises = df_exercises[df_exercises['SubjectCode'].str.contains(sql_filter, case=False, na=False, regex=True)].reset_index(drop=True)
     
+    # -------------------------------------------------------------
+    # LOGIC MỚI: TÁCH BIỆT LEVEL (SIÊNG NĂNG) VÀ TARGET DIFFICULTY (NĂNG LỰC)
+    # -------------------------------------------------------------
     student_history = df_history[df_history['StudentID'] == request.student_id]
-    if df_exercises.empty: return {"status": "success", "cf_error_message": "Chưa có dữ liệu bài tập trong SQL.", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "recommendations": []}
-
-    completed_exercises_ids = student_history[(student_history['Score'] >= 5.0) & (student_history['ExerciseID'].isin(df_exercises['ExerciseID']))]['ExerciseID'].tolist()
-    mastered_exercises_ids = student_history[(student_history['Score'] >= 8.0) & (student_history['ExerciseID'].isin(df_exercises['ExerciseID']))]['ExerciseID'].tolist()
     
-    str_student_id = str(request.student_id)
-    if mastered_exercises_ids: current_level = df_exercises[df_exercises['ExerciseID'].isin(mastered_exercises_ids)]['Difficulty'].max()
-    else:
-        if str_student_id.startswith("125"): current_level = 1
-        else:
-            if course_score >= 8.0: current_level = 3
-            elif course_score >= 6.5: current_level = 2
-            else: current_level = 1
-    if pd.isna(current_level): current_level = 1
+    # Những bài làm Đạt (>= 5.0)
+    completed_df = student_history[student_history['Score'] >= 5.0]
+    completed_exercises_ids = completed_df['ExerciseID'].tolist()
+    total_completed = len(completed_df)
+    
+    # 1. TÍNH LEVEL (Dựa vào tổng số bài đã làm Đạt - Cứ 5 bài lên 1 cấp)
+    if total_completed >= 20: current_level = 5
+    elif total_completed >= 15: current_level = 4
+    elif total_completed >= 10: current_level = 3
+    elif total_completed >= 5: current_level = 2
+    else: current_level = 1
 
+    # 2. TÍNH NĂNG LỰC THỰC TẾ
+    if total_completed > 0:
+        actual_competence = completed_df['Score'].mean() 
+    else:
+        actual_competence = course_score # COLD START từ Supabase
+
+    # 3. QUY ĐỔI NĂNG LỰC SANG ĐỘ KHÓ MỤC TIÊU
+    if actual_competence >= 8.5: target_difficulty = 3.0       
+    elif actual_competence >= 7.0: target_difficulty = 2.5     
+    elif actual_competence >= 5.5: target_difficulty = 2.0     
+    elif actual_competence >= 4.0: target_difficulty = 1.5     
+    else: target_difficulty = 1.0                              
+    
     candidate_exercises = df_exercises[(~df_exercises['ExerciseID'].isin(completed_exercises_ids))]
-    if candidate_exercises.empty: return {"status": "success", "cf_error_message": "Tuyệt vời! Bạn đã hoàn thành toàn bộ bài tập.", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "recommendations": []}
+    if candidate_exercises.empty: 
+        return {"status": "success", "cf_error_message": "Tuyệt vời! Bạn đã cày nát bài tập môn này.", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "recommendations": []}
 
     tfidf = TfidfVectorizer(); tfidf_matrix = tfidf.fit_transform(df_exercises['Tags']); cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
-    passed_indices = df_exercises[df_exercises['ExerciseID'].isin(mastered_exercises_ids)].index.tolist()
+    passed_indices = df_exercises[df_exercises['ExerciseID'].isin(completed_exercises_ids)].index.tolist()
     
     final_recommendations_with_score = []
     if passed_indices:
         sim_scores_cb = sum([cosine_sim[i] for i in passed_indices])
-        if type(sim_scores_cb) != list and sim_scores_cb.max() > sim_scores_cb.min(): sim_scores_cb = (sim_scores_cb - sim_scores_cb.min()) / (sim_scores_cb.max() - sim_scores_cb.min())
+        if type(sim_scores_cb) != list and sim_scores_cb.max() > sim_scores_cb.min(): 
+            sim_scores_cb = (sim_scores_cb - sim_scores_cb.min()) / (sim_scores_cb.max() - sim_scores_cb.min())
         cb_scores_dict = {df_exercises.iloc[idx]['ExerciseID']: sim_scores_cb[idx] for idx in df_exercises.index}
+        
         for _, row in candidate_exercises.iterrows():
-            final_score = cb_scores_dict.get(row['ExerciseID'], 0) - (abs(row['Difficulty'] - current_level) * 0.3) + random.uniform(0.01, 0.15)
+            penalty = abs(row['Difficulty'] - target_difficulty) * 0.3 
+            final_score = cb_scores_dict.get(row['ExerciseID'], 0) - penalty + random.uniform(0.01, 0.15)
             final_recommendations_with_score.append({"exercise": row.to_dict(), "final_score": float(final_score)})
     else:
         for _, row in candidate_exercises.iterrows():
-            final_score = (1.0 / (abs(row['Difficulty'] - current_level) + 1.0)) + random.uniform(0.01, 0.2)
+            penalty = abs(row['Difficulty'] - target_difficulty)
+            final_score = (1.0 / (penalty + 1.0)) + random.uniform(0.01, 0.2)
             final_recommendations_with_score.append({"exercise": row.to_dict(), "final_score": float(final_score)})
 
     sorted_recommendations = sorted(final_recommendations_with_score, key=lambda x: x['final_score'], reverse=True)
@@ -265,8 +285,8 @@ def export_student_progress(student_id: int, x_api_key: str = Header(None, descr
         conn = get_db_connection()
         df_history = pd.read_sql(text("SELECT h.MaBaiTap AS ExerciseID, b.TenBaiTap AS Title, ISNULL(b.MaMon, 'Không rõ') AS SubjectCode, h.DiemSo AS Score FROM AI_LichSuLamBai h JOIN BAITAP b ON h.MaBaiTap = b.Id WHERE h.MaSinhVien = :sv_id"), conn, params={"sv_id": student_id})
         conn.close()
-        return {"status": "success", "message": "Dữ liệu được cung cấp bởi Hệ thống AI Gợi Ý Bài Tập", "student_id": student_id, "total_exercises_done": len(df_history), "data": df_history.to_dict(orient="records")}
-    except Exception as e: raise HTTPException(status_code=500, detail=f"Lỗi truy xuất: {str(e)}")
+        return {"status": "success", "message": "Dữ liệu AI", "student_id": student_id, "data": df_history.to_dict(orient="records")}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 @app.head("/")
