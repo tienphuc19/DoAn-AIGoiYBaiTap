@@ -82,7 +82,7 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=gemini_api_key)
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-pro')
                 prompt = f"""Bạn là giảng viên chấm thi lập trình nghiêm khắc.
                 Hãy chấm điểm đoạn code của sinh viên.
                 - TÊN BÀI: {title}
