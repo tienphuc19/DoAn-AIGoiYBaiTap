@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>AI LEARNING - Hệ Thống Gợi Ý Bài Tập</title>
+    <title>AI LEARNING - Hệ Thống Gợi Ý Thông Minh</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -19,7 +19,7 @@
             <div class="text-center mb-8"><i class="fas fa-robot text-5xl text-blue-600 mb-2"></i><h2 class="text-3xl font-black text-blue-900">AI LOGIN</h2></div>
             <input type="text" id="username" class="w-full mb-4 p-4 border rounded-xl" placeholder="Tên đăng nhập">
             <input type="password" id="password" class="w-full mb-6 p-4 border rounded-xl" placeholder="Mật khẩu">
-            <button onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-xl font-bold hover:bg-blue-700">Đăng Nhập </button>
+            <button onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-xl font-bold hover:bg-blue-700">VÀO HỆ THỐNG</button>
         </div>
     </div>
 
@@ -45,7 +45,7 @@
                 <div id="stGrid" class="grid grid-cols-12 gap-6">
                     <div class="col-span-12 lg:col-span-4 space-y-6">
                         <div class="bg-white p-8 rounded-2xl border-t-4 border-yellow-400 shadow-sm">
-                            <p class="text-xs font-bold text-gray-400 uppercase mb-2">Học lực  (Supabase)</p>
+                            <p class="text-xs font-bold text-gray-400 uppercase mb-2">Học lực chung (Supabase)</p>
                             <div class="flex items-baseline gap-2"><span id="avgScore" class="text-6xl font-black">0.0</span><span class="text-gray-400 font-bold">/10</span></div>
                             <div id="rankLabel" class="mt-3 inline-block bg-green-100 text-green-700 px-4 py-1 rounded-full text-sm font-bold italic">---</div>
                         </div>
@@ -109,6 +109,33 @@
             <div class="p-6 bg-gray-50 border-t flex justify-end gap-3">
                 <button onclick="closeEx()" class="px-6 py-3 font-bold text-gray-500">Đóng</button>
                 <button id="btnSubmit" onclick="submitCode()" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-200">GỬI AI CHẤM ĐIỂM</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="studentHistoryModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+            <div class="bg-blue-900 p-6 text-white flex justify-between items-center">
+                <div><h2 class="text-2xl font-black">Chi tiết bài làm</h2><p id="shInfo" class="text-blue-200 text-sm mt-1">Sinh viên: ...</p></div>
+                <button onclick="closeStudentHistory()" class="text-white hover:text-red-300 text-3xl font-bold transition">&times;</button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1 bg-gray-50">
+                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-gray-100 text-gray-600 text-xs uppercase font-bold border-b border-gray-200">
+                            <tr>
+                                <th class="p-4">Tên bài tập</th>
+                                <th class="p-4 w-24 text-center">Độ khó</th>
+                                <th class="p-4 w-24 text-center">Điểm AI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="shBody" class="text-sm">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-6 py-4 border-t flex justify-end">
+                <button onclick="closeStudentHistory()" class="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg font-bold hover:bg-gray-300 transition">Đóng lại</button>
             </div>
         </div>
     </div>
@@ -207,14 +234,42 @@
                 <div class="bg-white p-6 rounded-3xl border shadow-sm gv-card">
                     <h4 class="text-xl font-black text-blue-900 border-b pb-3 mb-4">Lớp: ${c.class_name}</h4>
                     <div class="space-y-3">${c.students.map(s => `
-                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                        <div onclick="viewStudentHistory(${s.user_id}, '${s.fullname}')" class="flex justify-between items-center p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-blue-50 transition border border-transparent hover:border-blue-200">
                             <div><p class="font-bold text-gray-800 text-sm">${s.fullname}</p><p class="text-xs text-gray-400">Mã: ${s.username}</p></div>
-                            ${s.failed_count > 0 ? `<span class="bg-red-500 text-white text-[10px] px-2 py-1 rounded-full font-black">YẾU (${s.failed_count} BT)</span>` : `<i class="fas fa-check-circle text-green-500"></i>`}
+                            ${s.failed_count > 0 ? `<span class="bg-red-500 text-white text-[10px] px-2 py-1 rounded-full font-black shadow-sm">YẾU (${s.failed_count} BT)</span>` : `<i class="fas fa-check-circle text-green-500 text-lg"></i>`}
                         </div>`).join('')}</div>
                 </div>`).join('');
         }
 
-        function closeEx() { document.getElementById('exModal').classList.add('hidden'); }
+        // HÀM MỚI DÀNH CHO GIẢNG VIÊN XEM LỊCH SỬ SINH VIÊN
+        async function viewStudentHistory(studentId, studentName) {
+            document.getElementById('shInfo').innerText = `Sinh viên: ${studentName}`;
+            const tbody = document.getElementById('shBody');
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center p-8"><i class="fas fa-spinner fa-spin fa-2x text-blue-500"></i></td></tr>';
+            document.getElementById('studentHistoryModal').classList.remove('hidden');
+            
+            try {
+                const r = await fetch(`${API}/api/history/${studentId}`, {headers:{'x-user-role':'teacher'}});
+                const d = await r.json();
+                if (d.status === 'success') {
+                    if(d.history.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="3" class="text-center p-8 text-gray-500 font-bold">Sinh viên này chưa làm bài tập nào.</td></tr>';
+                    } else {
+                        tbody.innerHTML = d.history.map(h=>`<tr class="border-b border-gray-100 hover:bg-blue-50 transition">
+                            <td class="p-4 font-bold text-gray-800">${h.Title}</td>
+                            <td class="p-4 text-center"><span class="text-[10px] font-black uppercase px-2 py-1 rounded-md ${h.Difficulty==1?'bg-green-100 text-green-700':h.Difficulty==2?'bg-yellow-100 text-yellow-700':'bg-red-100 text-red-700'}">${h.Difficulty==1?'Dễ':h.Difficulty==2?'TB':'Khó'}</span></td>
+                            <td class="p-4 text-center font-black text-lg ${h.Score>=5?'text-green-600':'text-red-600'}">${h.Score.toFixed(1)}</td>
+                        </tr>`).join('');
+                    }
+                }
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center p-8 text-red-500 font-bold">Lỗi tải dữ liệu. Vui lòng thử lại!</td></tr>';
+            }
+        }
+
+        function closeStudentHistory() {
+            document.getElementById('studentHistoryModal').classList.add('hidden');
+        }
     </script>
 </body>
 </html>
