@@ -122,28 +122,39 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     course_score_supa = 0.0
     supa_key = os.getenv("SUPABASE_KEY")
     
-    # 1. Lấy điểm từ Supabase (Nền tảng khởi đầu)
+    # 1. BỘ DÒ TÌM SUPABASE VÉT CẠN
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
         try:
-            # Lấy Học lực chung
+            # Dò điểm Học lực chung
             res_int = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
             if res_int.status_code == 200 and len(res_int.json()) > 0:
                 fixed_avg_score = float(res_int.json()[0].get('integrated_score', 0.0))
                 academic_rank = str(res_int.json()[0].get('classification', ''))
             
-            # Lấy Năng lực môn
+            # Dò điểm Năng lực môn
             map_subj = {"CTDLGT": "CTDL", "OOP": "OOP", "NMLT": "NMLT", "KTLT": "KTLT"}
-            res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{map_subj.get(request.subject_code, '')}"}, timeout=5)
+            supa_code = map_subj.get(request.subject_code, request.subject_code)
+            
+            # Lần 1: Gọi bằng mã đã map (VD: CTDL)
+            res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{supa_code}"}, timeout=5)
+            
+            # Lần 2: Nếu không có, gọi thẳng bằng mã gốc từ Web (VD: CTDLGT)
+            if res_c.status_code == 200 and len(res_c.json()) == 0 and supa_code != request.subject_code:
+                res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{request.subject_code}"}, timeout=5)
+            
+            # Trích xuất điểm nếu có dữ liệu
             if res_c.status_code == 200 and len(res_c.json()) > 0:
-                course_score_supa = float(res_c.json()[0].get('score', 0.0))
+                data_row = res_c.json()[0]
+                # Vét cạn tên cột: nhóm Supabase có thể đặt là score, course_score, diem, diem_mon
+                course_score_supa = float(data_row.get('score', data_row.get('course_score', data_row.get('diem', data_row.get('diem_mon', 0.0)))))
         except: 
             pass
 
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
     
-    # 2. Bộ lọc môn học
+    # 2. Bộ lọc bài tập môn học
     if request.subject_code:
         if request.subject_code == 'OOP': pattern = 'OOP|LTHDT|Lập trình hướng đối tượng'
         elif request.subject_code == 'CTDLGT': pattern = 'CTDL|Cấu trúc dữ liệu'
@@ -159,7 +170,7 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     completed_ids = completed_df['ExerciseID'].tolist()
 
     # 3. Tính Năng Lực Hiện Tại của môn
-    # Đã tuân thủ: Nếu chưa làm bài AI nào thì lấy nguyên điểm môn Supabase (Dù là 0.0 vẫn giữ nguyên)
+    # Đã tuân thủ: Tuyệt đối chỉ lấy điểm AI hoặc điểm riêng của môn từ Supabase
     if len(completed_df) > 0:
         current_comp = float(completed_df['Score'].mean())
     else:
@@ -246,7 +257,7 @@ def login_user(request: LoginRequest):
         "username": request.username
     }
 
-# API GIẢNG VIÊN
+# API GIẢNG VIÊN (Tối giản)
 @app.get("/api/teacher/overview", tags=["Giảng Viên"])
 def get_teacher_overview(x_user_role: str = Header(None)):
     if x_user_role != "teacher": 
