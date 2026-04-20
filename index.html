@@ -35,9 +35,10 @@
         <main class="max-w-[1400px] mx-auto w-full p-6">
             <div id="stArea" class="hidden space-y-6">
                 <div class="flex bg-white rounded-xl shadow-sm border p-2 overflow-x-auto gap-2">
-                    <button onclick="loadSubject('CTDLGT', this)" class="tab-btn active-tab p-3 px-6 rounded-lg font-bold whitespace-nowrap">Cấu trúc dữ liệu</button>
+                    <button onclick="loadSubject('CTDLGT', this)" class="tab-btn active-tab p-3 px-6 rounded-lg font-bold whitespace-nowrap">Cấu trúc dữ liệu & Giải thuật</button>
                     <button onclick="loadSubject('KTLT', this)" class="tab-btn p-3 px-6 rounded-lg font-bold whitespace-nowrap">Kỹ thuật lập trình</button>
-                    <button onclick="loadSubject('OOP', this)" class="tab-btn p-3 px-6 rounded-lg font-bold whitespace-nowrap">Lập trình HĐT</button>
+                    <button onclick="loadSubject('OOP', this)" class="tab-btn p-3 px-6 rounded-lg font-bold whitespace-nowrap">Lập trình hướng đối tượng</button>
+                    <button onclick="loadSubject('NMLT', this)" class="tab-btn p-3 px-6 rounded-lg font-bold whitespace-nowrap">Nhập môn lập trình</button>
                     <button onclick="loadHistory(this)" class="tab-btn p-3 px-6 rounded-lg font-bold whitespace-nowrap bg-gray-50"><i class="fas fa-history mr-2"></i>Lịch sử</button>
                 </div>
 
@@ -146,7 +147,7 @@
                 document.getElementById('subjScore').innerText = d.subject_score.toFixed(1);
                 
                 const list = document.getElementById('recList');
-                if (d.recommendations.length===0) list.innerHTML = `<div class="p-10 text-center font-bold text-green-500 bg-green-50 rounded-2xl">Chúc mừng! Bạn đã chinh phục toàn bộ bài tập.</div>`;
+                if (d.recommendations.length===0) list.innerHTML = `<div class="p-10 text-center font-bold text-green-500 bg-green-50 rounded-2xl">Chưa có bài tập nào hoặc bạn đã hoàn thành hết!</div>`;
                 else list.innerHTML = d.recommendations.map(e => `
                     <div class="flex justify-between items-center p-5 border rounded-2xl hover:bg-gray-50 transition border-l-8 ${e.Difficulty==1?'border-green-400':e.Difficulty==2?'border-yellow-400':'border-red-400'}">
                         <div><h4 class="font-black text-gray-800">${e.Title}</h4><p class="text-xs text-gray-400 font-bold uppercase mt-1">Độ khó: ${e.Difficulty==1?'Dễ':e.Difficulty==2?'Trung bình':'Khó'}</p></div>
