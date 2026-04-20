@@ -106,7 +106,7 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
     except Exception as e: 
         raise HTTPException(status_code=500, detail=str(e))
 
-# THUẬT TOÁN GỢI Ý CỐT LÕI (CHỈ DÙNG CBF & ĐIỂM NĂNG LỰC)
+# THUẬT TOÁN GỢI Ý CỐT LÕI (CHỈ DÙNG CBF & ĐIỂM NĂNG LỰC CHÍNH XÁC)
 class RecommendRequest(BaseModel):
     student_id: int
     top_k: int = 6
@@ -126,11 +126,13 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
         try:
+            # Lấy Học lực chung
             res_int = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
             if res_int.status_code == 200 and len(res_int.json()) > 0:
                 fixed_avg_score = float(res_int.json()[0].get('integrated_score', 0.0))
                 academic_rank = str(res_int.json()[0].get('classification', ''))
             
+            # Lấy Năng lực môn
             map_subj = {"CTDLGT": "CTDL", "OOP": "OOP", "NMLT": "NMLT", "KTLT": "KTLT"}
             res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{map_subj.get(request.subject_code, '')}"}, timeout=5)
             if res_c.status_code == 200 and len(res_c.json()) > 0:
@@ -156,19 +158,17 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     completed_df = student_history[student_history['Score'] >= 5.0]
     completed_ids = completed_df['ExerciseID'].tolist()
 
-    # 3. Tính Năng Lực Hiện Tại của môn (BẢN VÁ LỖI 0.0)
-    # Thứ tự ưu tiên: Điểm do AI chấm -> Điểm môn Supabase -> Điểm chung Supabase
+    # 3. Tính Năng Lực Hiện Tại của môn
+    # Đã tuân thủ: Nếu chưa làm bài AI nào thì lấy nguyên điểm môn Supabase (Dù là 0.0 vẫn giữ nguyên)
     if len(completed_df) > 0:
         current_comp = float(completed_df['Score'].mean())
-    elif course_score_supa > 0:
-        current_comp = float(course_score_supa)
     else:
-        current_comp = float(fixed_avg_score) # Lấy điểm Học Lực Chung làm cứu cánh, không bao giờ để 0.0
+        current_comp = float(course_score_supa)
 
     # 4. Xác định Target Difficulty trực tiếp từ Điểm Năng Lực
     if current_comp >= 8.0: target_diff = 3.0       # Giỏi -> Ưu tiên bài Khó
     elif current_comp >= 6.0: target_diff = 2.0     # Khá/TB -> Ưu tiên bài Trung bình
-    else: target_diff = 1.0                         # Yếu -> Ưu tiên bài Dễ
+    else: target_diff = 1.0                         # Yếu/Chưa có điểm -> Ưu tiên bài Dễ
 
     candidate_ex = df_exercises[~df_exercises['ExerciseID'].isin(completed_ids)]
     
@@ -196,7 +196,6 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
         dict_cb = {df_exercises.iloc[idx]['ExerciseID']: scores_cb[idx] for idx in df_exercises.index}
         
         for _, r in candidate_ex.iterrows():
-            # Phạt nếu bài tập lệch với năng lực hiện tại
             penalty = abs(r['Difficulty'] - target_diff) * 0.4
             final_score = dict_cb.get(r['ExerciseID'], 0) - penalty
             final_list.append({"ex": r.to_dict(), "score": float(final_score)})
@@ -247,7 +246,7 @@ def login_user(request: LoginRequest):
         "username": request.username
     }
 
-# API GIẢNG VIÊN (Tối giản)
+# API GIẢNG VIÊN
 @app.get("/api/teacher/overview", tags=["Giảng Viên"])
 def get_teacher_overview(x_user_role: str = Header(None)):
     if x_user_role != "teacher": 
