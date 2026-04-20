@@ -106,7 +106,7 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
     except Exception as e: 
         raise HTTPException(status_code=500, detail=str(e))
 
-# THUẬT TOÁN GỢI Ý (CHỈNH SỬA 4 MỨC ĐỘ)
+# THUẬT TOÁN GỢI Ý (CHỈNH SỬA 4 MỨC ĐỘ & LỌC ĐÚNG MÔN HỌC)
 class RecommendRequest(BaseModel):
     student_id: int
     top_k: int = 6
@@ -122,6 +122,7 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     course_score_supa = 0.0
     supa_key = os.getenv("SUPABASE_KEY")
     
+    # Lấy điểm từ Supabase
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
         try:
@@ -140,16 +141,31 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
     
-    # Lọc môn học
+    # 1. BỘ LỌC TÌM KIẾM MÔN HỌC (Sửa lỗi báo hết bài tập)
     if request.subject_code:
-        pattern = 'CTDL|Cấu trúc dữ liệu' if request.subject_code == 'CTDLGT' else request.subject_code
+        if request.subject_code == 'OOP':
+            pattern = 'OOP|LTHDT|Lập trình hướng đối tượng'
+        elif request.subject_code == 'CTDLGT':
+            pattern = 'CTDL|Cấu trúc dữ liệu'
+        elif request.subject_code == 'NMLT':
+            pattern = 'NMLT|Nhập môn lập trình'
+        elif request.subject_code == 'KTLT':
+            pattern = 'KTLT|Kỹ thuật lập trình'
+        else:
+            pattern = request.subject_code
+            
         df_exercises = df_exercises[df_exercises['SubjectCode'].str.contains(pattern, case=False, na=False)].reset_index(drop=True)
 
-    student_history = df_history[df_history['StudentID'] == request.student_id]
+    # Lấy danh sách ID bài tập CỦA MÔN ĐANG CHỌN
+    subject_exercise_ids = df_exercises['ExerciseID'].tolist()
+
+    # 2. LỌC LỊCH SỬ CHỈ THUỘC VỀ MÔN ĐANG CHỌN (Sửa lỗi dính điểm)
+    student_history = df_history[(df_history['StudentID'] == request.student_id) & (df_history['ExerciseID'].isin(subject_exercise_ids))]
+    
     completed_df = student_history[student_history['Score'] >= 5.0]
     completed_ids = completed_df['ExerciseID'].tolist()
 
-    # Tính Năng Lực Hiện Tại (Ưu tiên điểm AI chấm thực tế)
+    # Tính Năng Lực Hiện Tại CỦA RIÊNG MÔN NÀY
     if len(completed_df) > 0:
         current_comp = float(completed_df['Score'].mean())
     else:
@@ -170,6 +186,7 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
         target_diff = 1.0
 
     candidate_ex = df_exercises[~df_exercises['ExerciseID'].isin(completed_ids)]
+    
     if candidate_ex.empty: 
         return {
             "status": "success", 
@@ -194,7 +211,8 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
         dict_cb = {df_exercises.iloc[idx]['ExerciseID']: scores_cb[idx] for idx in df_exercises.index}
         
         for _, r in candidate_ex.iterrows():
-            final_score = dict_cb.get(r['ExerciseID'], 0) - (abs(r['Difficulty'] - target_diff) * 0.5)
+            penalty = abs(r['Difficulty'] - target_diff) * 0.5
+            final_score = dict_cb.get(r['ExerciseID'], 0) - penalty
             final_list.append({"ex": r.to_dict(), "score": float(final_score)})
     else:
         for _, r in candidate_ex.iterrows():
