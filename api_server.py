@@ -14,12 +14,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập ")
+app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập AI")
 
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
 )
 
+# KẾT NỐI DATABASE
 def get_db_connection():
     db_url = "mssql+pymssql://userPersonalizedSystem:123456789@118.69.126.49/Data_PersonalizedSystem"
     return create_engine(db_url).connect()
@@ -36,6 +37,7 @@ def load_data_from_sql():
     except Exception as e: 
         raise HTTPException(status_code=500, detail=f"Lỗi SQL: {str(e)}")
 
+# API CHI TIẾT BÀI TẬP
 @app.get("/api/exercise-details/{ex_id}", tags=["Sinh Viên"])
 def get_exercise_details(ex_id: int):
     conn = get_db_connection()
@@ -43,12 +45,16 @@ def get_exercise_details(ex_id: int):
     try:
         df_bt = pd.read_sql(f"SELECT * FROM BAITAP WHERE Id = {ex_id}", conn)
         if not df_bt.empty:
-            if 'MoTa' in df_bt.columns and pd.notna(df_bt['MoTa'].iloc[0]): mota = str(df_bt['MoTa'].iloc[0])
-            if 'YeuCau' in df_bt.columns and pd.notna(df_bt['YeuCau'].iloc[0]): yeucau = str(df_bt['YeuCau'].iloc[0])
-    except Exception: pass
+            if 'MoTa' in df_bt.columns and pd.notna(df_bt['MoTa'].iloc[0]): 
+                mota = str(df_bt['MoTa'].iloc[0])
+            if 'YeuCau' in df_bt.columns and pd.notna(df_bt['YeuCau'].iloc[0]): 
+                yeucau = str(df_bt['YeuCau'].iloc[0])
+    except Exception: 
+        pass
     conn.close()
     return {"status": "success", "mota": mota, "yeucau": yeucau}
 
+# API CHẤM ĐIỂM AI (GEMINI-PRO)
 class MockGradeRequest(BaseModel):
     student_id: int
     exercise_id: int
@@ -56,11 +62,13 @@ class MockGradeRequest(BaseModel):
 
 @app.post("/api/mock-grade-and-submit", tags=["Sinh Viên"])
 def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header(None, description="Bắt buộc nhập 'student'")):
-    if x_user_role != "student": raise HTTPException(status_code=403, detail="Cấm truy cập!")
+    if x_user_role != "student": 
+        raise HTTPException(status_code=403, detail="Cấm truy cập!")
     try:
         conn = get_db_connection()
         df_bt = pd.read_sql(f"SELECT TenBaiTap FROM BAITAP WHERE Id = {request.exercise_id}", conn)
         title = df_bt.iloc[0]['TenBaiTap'] if not df_bt.empty else "Bài tập lập trình"
+        
         gemini_api_key = os.getenv("GEMINI_API_KEY")
         code_sinh_vien = request.submitted_work.strip()
         
@@ -92,10 +100,13 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
                 INSERT INTO AI_LichSuLamBai (MaSinhVien, MaBaiTap, DiemSo) VALUES (:sv_id, :ex_id, :grade)
         """)
         conn.execute(query_upsert, {"sv_id": request.student_id, "ex_id": request.exercise_id, "grade": final_grade})
-        conn.commit(); conn.close()
+        conn.commit() 
+        conn.close()
         return {"status": "success", "score": final_grade, "passed": final_grade >= 5.0, "feedback": feedback}
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e: 
+        raise HTTPException(status_code=500, detail=str(e))
 
+# THUẬT TOÁN GỢI Ý CỐT LÕI (CHỈ DÙNG CBF & ĐIỂM NĂNG LỰC)
 class RecommendRequest(BaseModel):
     student_id: int
     top_k: int = 6
@@ -103,11 +114,15 @@ class RecommendRequest(BaseModel):
 
 @app.post("/api/recommend", tags=["Sinh Viên"])
 def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header(None, description="Bắt buộc nhập 'student'")):
-    if x_user_role != "student": raise HTTPException(status_code=403, detail="Cấm truy cập!")
+    if x_user_role != "student": 
+        raise HTTPException(status_code=403, detail="Cấm truy cập!")
     
-    fixed_avg_score = 0.0; academic_rank = "Chưa có điểm"; course_score_supa = 0.0
+    fixed_avg_score = 0.0
+    academic_rank = "Chưa có điểm"
+    course_score_supa = 0.0
     supa_key = os.getenv("SUPABASE_KEY")
     
+    # 1. Lấy điểm từ Supabase (Nền tảng khởi đầu)
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
         try:
@@ -120,11 +135,13 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
             res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{map_subj.get(request.subject_code, '')}"}, timeout=5)
             if res_c.status_code == 200 and len(res_c.json()) > 0:
                 course_score_supa = float(res_c.json()[0].get('score', 0.0))
-        except: pass
+        except: 
+            pass
 
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
     
+    # 2. Bộ lọc môn học
     if request.subject_code:
         if request.subject_code == 'OOP': pattern = 'OOP|LTHDT|Lập trình hướng đối tượng'
         elif request.subject_code == 'CTDLGT': pattern = 'CTDL|Cấu trúc dữ liệu'
@@ -139,68 +156,119 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     completed_df = student_history[student_history['Score'] >= 5.0]
     completed_ids = completed_df['ExerciseID'].tolist()
 
-    if len(completed_df) > 0: current_comp = float(completed_df['Score'].mean())
-    else: current_comp = float(course_score_supa)
+    # 3. Tính Năng Lực Hiện Tại của môn (BẢN VÁ LỖI 0.0)
+    # Thứ tự ưu tiên: Điểm do AI chấm -> Điểm môn Supabase -> Điểm chung Supabase
+    if len(completed_df) > 0:
+        current_comp = float(completed_df['Score'].mean())
+    elif course_score_supa > 0:
+        current_comp = float(course_score_supa)
+    else:
+        current_comp = float(fixed_avg_score) # Lấy điểm Học Lực Chung làm cứu cánh, không bao giờ để 0.0
 
-    if current_comp >= 8.0: target_diff = 3.0
-    elif current_comp >= 6.0: target_diff = 2.0
-    else: target_diff = 1.0
+    # 4. Xác định Target Difficulty trực tiếp từ Điểm Năng Lực
+    if current_comp >= 8.0: target_diff = 3.0       # Giỏi -> Ưu tiên bài Khó
+    elif current_comp >= 6.0: target_diff = 2.0     # Khá/TB -> Ưu tiên bài Trung bình
+    else: target_diff = 1.0                         # Yếu -> Ưu tiên bài Dễ
 
     candidate_ex = df_exercises[~df_exercises['ExerciseID'].isin(completed_ids)]
+    
     if candidate_ex.empty: 
-        return {"status": "success", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "subject_score": round(current_comp, 1), "recommendations": []}
+        return {
+            "status": "success", 
+            "avg_score": fixed_avg_score, 
+            "academic_rank": academic_rank,
+            "subject_score": round(current_comp, 1), 
+            "recommendations": []
+        }
 
-    tfidf = TfidfVectorizer(); tf_matrix = tfidf.fit_transform(df_exercises['Tags']); cos_sim = cosine_similarity(tf_matrix, tf_matrix)
+    # 5. Thuật toán lọc dựa trên nội dung (CBF)
+    tfidf = TfidfVectorizer()
+    tf_matrix = tfidf.fit_transform(df_exercises['Tags'])
+    cos_sim = cosine_similarity(tf_matrix, tf_matrix)
     passed_idx = df_exercises[df_exercises['ExerciseID'].isin(completed_ids)].index.tolist()
     
     final_list = []
     if passed_idx:
         scores_cb = sum([cos_sim[i] for i in passed_idx])
-        if type(scores_cb) != list and scores_cb.max() > scores_cb.min(): scores_cb = (scores_cb - scores_cb.min()) / (scores_cb.max() - scores_cb.min())
+        if type(scores_cb) != list and scores_cb.max() > scores_cb.min(): 
+            scores_cb = (scores_cb - scores_cb.min()) / (scores_cb.max() - scores_cb.min())
+        
         dict_cb = {df_exercises.iloc[idx]['ExerciseID']: scores_cb[idx] for idx in df_exercises.index}
+        
         for _, r in candidate_ex.iterrows():
+            # Phạt nếu bài tập lệch với năng lực hiện tại
             penalty = abs(r['Difficulty'] - target_diff) * 0.4
-            final_list.append({"ex": r.to_dict(), "score": float(dict_cb.get(r['ExerciseID'], 0) - penalty)})
+            final_score = dict_cb.get(r['ExerciseID'], 0) - penalty
+            final_list.append({"ex": r.to_dict(), "score": float(final_score)})
     else:
+        # Xử lý Cold-Start
         for _, r in candidate_ex.iterrows():
-            final_list.append({"ex": r.to_dict(), "score": float(1.0 / (abs(r['Difficulty'] - target_diff) + 1.0))})
+            final_score = 1.0 / (abs(r['Difficulty'] - target_diff) + 1.0)
+            final_list.append({"ex": r.to_dict(), "score": float(final_score)})
 
     sorted_res = sorted(final_list, key=lambda x: x['score'], reverse=True)
-    return {"status": "success", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "subject_score": round(current_comp, 1), "recommendations": [i['ex'] for i in sorted_res[:request.top_k]]}
+    
+    return {
+        "status": "success", 
+        "avg_score": fixed_avg_score, 
+        "academic_rank": academic_rank,
+        "subject_score": round(current_comp, 1), 
+        "recommendations": [i['ex'] for i in sorted_res[:request.top_k]]
+    }
 
+# API LỊCH SỬ
 @app.get("/api/history/{student_id}", tags=["Sinh Viên"])
 def get_student_history(student_id: int, x_user_role: str = Header(None)):
-    if x_user_role != "student": raise HTTPException(status_code=403)
+    if x_user_role != "student": 
+        raise HTTPException(status_code=403)
     conn = get_db_connection()
-    df = pd.read_sql(text("SELECT h.MaBaiTap AS ExerciseID, b.TenBaiTap AS Title, h.DiemSo AS Score, b.MaDoKho AS Difficulty FROM AI_LichSuLamBai h JOIN BAITAP b ON h.MaBaiTap = b.Id WHERE h.MaSinhVien = :sv_id ORDER BY h.DiemSo DESC"), conn, params={"sv_id": student_id})
+    query = text("SELECT h.MaBaiTap AS ExerciseID, b.TenBaiTap AS Title, h.DiemSo AS Score, b.MaDoKho AS Difficulty FROM AI_LichSuLamBai h JOIN BAITAP b ON h.MaBaiTap = b.Id WHERE h.MaSinhVien = :sv_id ORDER BY h.DiemSo DESC")
+    df = pd.read_sql(query, conn, params={"sv_id": student_id})
     conn.close()
     return {"status": "success", "history": df.to_dict(orient="records")}
 
-class LoginRequest(BaseModel): username: str; password: str
+# API ĐĂNG NHẬP
+class LoginRequest(BaseModel): 
+    username: str
+    password: str
+
 @app.post("/api/login", tags=["Hệ Thống"])
 def login_user(request: LoginRequest):
     conn = get_db_connection()
     df = pd.read_sql(text("SELECT VaiTro, MaNguoiDung, HoTen FROM TAIKHOAN WHERE TenDangNhap = :u AND MatKhau = :p"), conn, params={"u": request.username, "p": request.password})
     conn.close()
-    if df.empty: return {"status": "error", "message": "Sai thông tin!"}
-    return {"status": "success", "role": df.iloc[0]['VaiTro'], "user_id": int(df.iloc[0]['MaNguoiDung']), "full_name": df.iloc[0]['HoTen'], "username": request.username}
+    if df.empty: 
+        return {"status": "error", "message": "Sai thông tin!"}
+    return {
+        "status": "success", 
+        "role": df.iloc[0]['VaiTro'], 
+        "user_id": int(df.iloc[0]['MaNguoiDung']), 
+        "full_name": df.iloc[0]['HoTen'], 
+        "username": request.username
+    }
 
+# API GIẢNG VIÊN (Tối giản)
 @app.get("/api/teacher/overview", tags=["Giảng Viên"])
 def get_teacher_overview(x_user_role: str = Header(None)):
-    if x_user_role != "teacher": raise HTTPException(status_code=403)
+    if x_user_role != "teacher": 
+        raise HTTPException(status_code=403)
     conn = get_db_connection()
     df_sv = pd.read_sql("SELECT MaNguoiDung, TenDangNhap, HoTen FROM TAIKHOAN WHERE VaiTro = 'student'", conn)
     df_diem = pd.read_sql("SELECT MaSinhVien, DiemSo FROM AI_LichSuLamBai", conn)
     conn.close()
+    
     df_sv['Lop'] = df_sv['HoTen'].str.extract(r'\((.*?)\)')[0].fillna('Chưa rõ')
     failed = df_diem[df_diem['DiemSo'] < 5.0].groupby('MaSinhVien').size().reset_index(name='f')
     df_sv = pd.merge(df_sv, failed, left_on='MaNguoiDung', right_on='MaSinhVien', how='left').fillna(0)
+    
     classes = []
     for name, gp in df_sv.groupby('Lop'):
         sts = gp.apply(lambda r: {"user_id": int(r['MaNguoiDung']), "username": r['TenDangNhap'], "fullname": r['HoTen'], "failed_count": int(r['f'])}, axis=1).tolist()
         classes.append({"class_name": name, "student_count": len(sts), "students": sts})
+    
     return {"status": "success", "weak_students_count": int((df_sv['f'] > 0).sum()), "classes": classes}
 
 @app.get("/")
 @app.head("/")
-def serve_frontend(): return FileResponse("index.html") if os.path.exists("index.html") else {"m": "No index.html"}
+def serve_frontend(): 
+    return FileResponse("index.html") if os.path.exists("index.html") else {"m": "No index.html"}
