@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập AI - Chuẩn GDPT 2018")
+app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập AI")
 
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
@@ -106,7 +106,7 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
     except Exception as e: 
         raise HTTPException(status_code=500, detail=str(e))
 
-# THUẬT TOÁN GỢI Ý (CHỈNH SỬA 4 MỨC ĐỘ & LỌC ĐÚNG MÔN HỌC)
+# THUẬT TOÁN GỢI Ý CỐT LÕI (CHỈ DÙNG CBF & ĐIỂM NĂNG LỰC)
 class RecommendRequest(BaseModel):
     student_id: int
     top_k: int = 6
@@ -122,7 +122,7 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     course_score_supa = 0.0
     supa_key = os.getenv("SUPABASE_KEY")
     
-    # Lấy điểm từ Supabase
+    # 1. Lấy điểm từ Supabase (Nền tảng khởi đầu)
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
         try:
@@ -141,62 +141,44 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
     
-    # 1. BỘ LỌC TÌM KIẾM MÔN HỌC (Sửa lỗi báo hết bài tập)
+    # 2. Bộ lọc môn học
     if request.subject_code:
-        if request.subject_code == 'OOP':
-            pattern = 'OOP|LTHDT|Lập trình hướng đối tượng'
-        elif request.subject_code == 'CTDLGT':
-            pattern = 'CTDL|Cấu trúc dữ liệu'
-        elif request.subject_code == 'NMLT':
-            pattern = 'NMLT|Nhập môn lập trình'
-        elif request.subject_code == 'KTLT':
-            pattern = 'KTLT|Kỹ thuật lập trình'
-        else:
-            pattern = request.subject_code
-            
+        if request.subject_code == 'OOP': pattern = 'OOP|LTHDT|Lập trình hướng đối tượng'
+        elif request.subject_code == 'CTDLGT': pattern = 'CTDL|Cấu trúc dữ liệu'
+        elif request.subject_code == 'NMLT': pattern = 'NMLT|Nhập môn lập trình'
+        elif request.subject_code == 'KTLT': pattern = 'KTLT|Kỹ thuật lập trình'
+        else: pattern = request.subject_code
         df_exercises = df_exercises[df_exercises['SubjectCode'].str.contains(pattern, case=False, na=False)].reset_index(drop=True)
 
-    # Lấy danh sách ID bài tập CỦA MÔN ĐANG CHỌN
     subject_exercise_ids = df_exercises['ExerciseID'].tolist()
-
-    # 2. LỌC LỊCH SỬ CHỈ THUỘC VỀ MÔN ĐANG CHỌN (Sửa lỗi dính điểm)
     student_history = df_history[(df_history['StudentID'] == request.student_id) & (df_history['ExerciseID'].isin(subject_exercise_ids))]
     
     completed_df = student_history[student_history['Score'] >= 5.0]
     completed_ids = completed_df['ExerciseID'].tolist()
 
-    # Tính Năng Lực Hiện Tại CỦA RIÊNG MÔN NÀY
+    # 3. Tính Năng Lực Hiện Tại của môn (Ưu tiên điểm thực tế AI chấm)
     if len(completed_df) > 0:
         current_comp = float(completed_df['Score'].mean())
     else:
         current_comp = float(course_score_supa)
 
-    # PHÂN LOẠI 4 MỨC ĐỘ NHẬN THỨC CHUẨN GDPT
-    if current_comp >= 8.5: 
-        lv_name = "Mức 4 (Vận dụng cao)"
-        target_diff = 3.0
-    elif current_comp >= 7.0: 
-        lv_name = "Mức 3 (Vận dụng)"
-        target_diff = 2.5
-    elif current_comp >= 5.0: 
-        lv_name = "Mức 2 (Thông hiểu)"
-        target_diff = 1.5
-    else: 
-        lv_name = "Mức 1 (Nhận biết)"
-        target_diff = 1.0
+    # 4. Xác định Target Difficulty trực tiếp từ Điểm Năng Lực (Không dùng Level)
+    if current_comp >= 8.0: target_diff = 3.0       # Giỏi -> Ưu tiên bài Khó
+    elif current_comp >= 6.0: target_diff = 2.0     # Khá/TB -> Ưu tiên bài Trung bình
+    else: target_diff = 1.0                         # Yếu -> Ưu tiên bài Dễ
 
     candidate_ex = df_exercises[~df_exercises['ExerciseID'].isin(completed_ids)]
     
     if candidate_ex.empty: 
         return {
             "status": "success", 
-            "current_level_name": lv_name, 
             "avg_score": fixed_avg_score, 
             "academic_rank": academic_rank,
             "subject_score": round(current_comp, 1), 
             "recommendations": []
         }
 
+    # 5. Thuật toán lọc dựa trên nội dung (CBF)
     tfidf = TfidfVectorizer()
     tf_matrix = tfidf.fit_transform(df_exercises['Tags'])
     cos_sim = cosine_similarity(tf_matrix, tf_matrix)
@@ -211,10 +193,12 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
         dict_cb = {df_exercises.iloc[idx]['ExerciseID']: scores_cb[idx] for idx in df_exercises.index}
         
         for _, r in candidate_ex.iterrows():
-            penalty = abs(r['Difficulty'] - target_diff) * 0.5
+            # Phạt nếu bài tập lệch với năng lực hiện tại
+            penalty = abs(r['Difficulty'] - target_diff) * 0.4
             final_score = dict_cb.get(r['ExerciseID'], 0) - penalty
             final_list.append({"ex": r.to_dict(), "score": float(final_score)})
     else:
+        # Xử lý Cold-Start
         for _, r in candidate_ex.iterrows():
             final_score = 1.0 / (abs(r['Difficulty'] - target_diff) + 1.0)
             final_list.append({"ex": r.to_dict(), "score": float(final_score)})
@@ -223,7 +207,6 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     
     return {
         "status": "success", 
-        "current_level_name": lv_name, 
         "avg_score": fixed_avg_score, 
         "academic_rank": academic_rank,
         "subject_score": round(current_comp, 1), 
@@ -261,7 +244,7 @@ def login_user(request: LoginRequest):
         "username": request.username
     }
 
-# API GIẢNG VIÊN (BỎ MẠNG NHỆN)
+# API GIẢNG VIÊN (Tối giản)
 @app.get("/api/teacher/overview", tags=["Giảng Viên"])
 def get_teacher_overview(x_user_role: str = Header(None)):
     if x_user_role != "teacher": 
