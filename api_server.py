@@ -212,3 +212,12 @@ def get_teacher_overview(x_user_role: str = Header(None)):
 @app.get("/")
 @app.head("/")
 def serve_frontend(): return FileResponse("index.html") if os.path.exists("index.html") else {"m": "No index.html"}
+    if candidate_ex.empty: 
+        return {
+            "status": "success", 
+            "current_level_name": lv_name, 
+            "avg_score": float(fixed_avg_score), 
+            "academic_rank": academic_rank,
+            "subject_score": round(current_comp, 1), 
+            "recommendations": []
+        }
