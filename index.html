@@ -19,7 +19,7 @@
             <div class="text-center mb-8"><i class="fas fa-robot text-5xl text-blue-600 mb-2"></i><h2 class="text-3xl font-black text-blue-900">AI LOGIN</h2></div>
             <input type="text" id="username" class="w-full mb-4 p-4 border rounded-xl" placeholder="Tên đăng nhập">
             <input type="password" id="password" class="w-full mb-6 p-4 border rounded-xl" placeholder="Mật khẩu">
-            <button onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-xl font-bold hover:bg-blue-700">Đăng Nhập</button>
+            <button onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-xl font-bold hover:bg-blue-700">Đăng Nhập </button>
         </div>
     </div>
 
@@ -73,7 +73,7 @@
                 <div id="stHistory" class="hidden bg-white p-8 rounded-2xl shadow-sm border">
                     <h3 class="text-xl font-black mb-6">Lịch sử rèn luyện</h3>
                     <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
-                        <thead class="bg-gray-50 text-gray-400 text-xs uppercase font-bold"><tr><th class="p-4">Tên bài tập</th><th class="p-4">Độ khó</th><th class="p-4">Điểm AI</th></tr></thead>
+                        <thead class="bg-gray-50 text-gray-400 text-xs uppercase font-bold"><tr><th class="p-4">Tên bài tập</th><th class="p-4 w-32 text-center">Độ khó</th><th class="p-4 w-32 text-center">Điểm hệ thống</th></tr></thead>
                         <tbody id="histBody"></tbody>
                     </table></div>
                 </div>
@@ -100,15 +100,24 @@
                     <h4 class="font-black text-blue-900 mb-2 italic">Yêu cầu & Mô tả</h4>
                     <div id="mDesc" class="text-gray-600 text-sm leading-relaxed whitespace-pre-line">---</div>
                 </div>
+                
                 <div class="space-y-2">
-                    <h4 class="font-black text-gray-800">Trình soạn thảo mã nguồn</h4>
-                    <textarea id="mCode" class="w-full bg-slate-900 text-green-400 p-6 font-mono text-sm rounded-2xl h-64 focus:ring-4 focus:ring-blue-100 outline-none border-none" placeholder="// Dán code vào đây..."></textarea>
+                    <div class="flex justify-between items-end mb-2">
+                        <h4 class="font-black text-gray-800">Trình soạn thảo mã nguồn</h4>
+                        <label class="cursor-pointer bg-blue-100 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-200 transition shadow-sm flex items-center">
+                            <i class="fas fa-file-upload mr-2"></i> Tải file code lên
+                            <input type="file" id="fileUpload" accept=".c,.cpp,.py,.java,.cs,.txt" class="hidden" onchange="handleFileUpload(event)">
+                        </label>
+                    </div>
+                    <textarea id="mCode" class="w-full bg-slate-900 text-green-400 p-6 font-mono text-sm rounded-2xl h-64 focus:ring-4 focus:ring-blue-100 outline-none border-none" placeholder="// Bạn có thể dán code vào đây, hoặc bấm 'Tải file code lên' ở góc trên..."></textarea>
+                    <p id="fileNameDisplay" class="text-xs text-green-600 font-bold hidden"><i class="fas fa-check-circle mr-1"></i>Đã tải file: <span id="fName"></span></p>
                 </div>
+                
                 <div id="mRes" class="hidden p-6 rounded-2xl border-2 animate-pulse"></div>
             </div>
             <div class="p-6 bg-gray-50 border-t flex justify-end gap-3">
-                <button onclick="closeEx()" class="px-6 py-3 font-bold text-gray-500">Đóng</button>
-                <button id="btnSubmit" onclick="submitCode()" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-200">GỬI AI CHẤM ĐIỂM</button>
+                <button onclick="closeEx()" class="px-6 py-3 font-bold text-gray-500 hover:bg-gray-200 rounded-xl transition">Đóng lại</button>
+                <button id="btnSubmit" onclick="submitCode()" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-200 transition">NỘP BÀI LÊN HỆ THỐNG</button>
             </div>
         </div>
     </div>
@@ -123,14 +132,9 @@
                 <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-gray-100 text-gray-600 text-xs uppercase font-bold border-b border-gray-200">
-                            <tr>
-                                <th class="p-4">Tên bài tập</th>
-                                <th class="p-4 w-24 text-center">Độ khó</th>
-                                <th class="p-4 w-24 text-center">Điểm AI</th>
-                            </tr>
+                            <tr><th class="p-4">Tên bài tập</th><th class="p-4 w-24 text-center">Độ khó</th><th class="p-4 w-24 text-center">Điểm số</th></tr>
                         </thead>
-                        <tbody id="shBody" class="text-sm">
-                            </tbody>
+                        <tbody id="shBody" class="text-sm"></tbody>
                     </table>
                 </div>
             </div>
@@ -188,28 +192,61 @@
             document.getElementById('mTitle').innerText = t;
             document.getElementById('mInfo').innerText = `Môn: ${s} | Độ khó: ${d==1?'Dễ':d==2?'TB':'Khó'}`;
             document.getElementById('mCode').value = '';
+            document.getElementById('fileNameDisplay').classList.add('hidden');
+            document.getElementById('fileUpload').value = '';
             document.getElementById('mRes').classList.add('hidden');
             document.getElementById('exModal').classList.remove('hidden');
+            
             const res = await fetch(`${API}/api/exercise-details/${id}`);
             const data = await res.json();
             document.getElementById('mDesc').innerHTML = `<b>Yêu cầu:</b> ${data.yeucau}<br><br><b>Mô tả:</b> ${data.mota}`;
         }
 
+        // --- HÀM MỚI: XỬ LÝ KHI CHỌN FILE CODE ---
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Đọc nội dung file dưới dạng text
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // Đổ text vào khung soạn thảo
+                document.getElementById('mCode').value = e.target.result;
+                
+                // Hiển thị tên file cho sinh viên biết là đã tải thành công
+                document.getElementById('fileNameDisplay').classList.remove('hidden');
+                document.getElementById('fName').innerText = file.name;
+            };
+            reader.readAsText(file);
+            
+            // Reset input để nếu xóa code đi muốn chọn lại file cũ vẫn nhận
+            event.target.value = '';
+        }
+
         async function submitCode() {
             const code = document.getElementById('mCode').value, btn = document.getElementById('btnSubmit');
-            if (code.length < 15) return alert("Code quá ngắn!");
-            btn.disabled = true; btn.innerText = "AI ĐANG CHẤM...";
-            const r = await fetch(`${API}/api/mock-grade-and-submit`, {method:'POST', headers:{'Content-Type':'application/json','x-user-role':'student'}, body:JSON.stringify({student_id:user.user_id, exercise_id:activeExId, submitted_work:code})});
-            const d = await r.json();
-            const resBox = document.getElementById('mRes');
-            resBox.classList.remove('hidden');
-            resBox.className = `p-6 rounded-2xl border-2 mt-4 ${d.score>=5?'bg-green-50 border-green-200':'bg-red-50 border-red-200'}`;
-            resBox.innerHTML = `<h5 class="text-2xl font-black ${d.score>=5?'text-green-700':'text-red-700'}">KẾT QUẢ: ${d.score.toFixed(1)}/10</h5>
-                               <p class="text-sm mt-3 font-bold text-gray-700"><b>Nhận xét:</b> ${d.feedback.criteria_eval}</p>
-                               <p class="text-sm text-green-600 mt-2"><b>Ưu điểm:</b> ${d.feedback.strengths}</p>
-                               <p class="text-sm text-red-600 mt-1"><b>Cần sửa:</b> ${d.feedback.weaknesses}</p>`;
-            btn.disabled = false; btn.innerText = "GỬI AI CHẤM ĐIỂM";
-            setTimeout(() => { if(document.querySelector('.tab-btn.active-tab')) document.querySelector('.tab-btn.active-tab').click(); }, 2000);
+            if (code.length < 5) return alert("Code quá ngắn hoặc chưa có nội dung!");
+            
+            btn.disabled = true; btn.innerText = "HỆ THỐNG ĐANG CHẤM...";
+            
+            try {
+                const r = await fetch(`${API}/api/mock-grade-and-submit`, {
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json','x-user-role':'student'}, 
+                    body:JSON.stringify({student_id:user.user_id, exercise_id:activeExId, submitted_work:code})
+                });
+                const d = await r.json();
+                const resBox = document.getElementById('mRes');
+                resBox.classList.remove('hidden');
+                resBox.className = `p-6 rounded-2xl border-2 mt-4 ${d.score>=5?'bg-green-50 border-green-200':'bg-red-50 border-red-200'}`;
+                resBox.innerHTML = `<h5 class="text-2xl font-black ${d.score>=5?'text-green-700':'text-red-700'}">ĐIỂM: ${d.score.toFixed(1)}/10</h5>
+                                   <p class="text-sm mt-3 font-bold text-gray-700"><b>Nhận xét:</b> ${d.feedback.criteria_eval}</p>`;
+                btn.disabled = false; btn.innerText = "NỘP BÀI LÊN HỆ THỐNG";
+                setTimeout(() => { if(document.querySelector('.tab-btn.active-tab')) document.querySelector('.tab-btn.active-tab').click(); }, 2000);
+            } catch (error) {
+                alert("Lỗi kết nối máy chủ!");
+                btn.disabled = false; btn.innerText = "NỘP BÀI LÊN HỆ THỐNG";
+            }
         }
 
         async function loadHistory(btn) {
@@ -221,8 +258,8 @@
             const d = await r.json();
             document.getElementById('histBody').innerHTML = d.history.map(h=>`<tr class="border-b">
                 <td class="p-4 font-bold text-blue-800">${h.Title}</td>
-                <td class="p-4"><span class="text-xs font-black uppercase px-3 py-1 rounded-full ${h.Difficulty==1?'bg-green-100':h.Difficulty==2?'bg-yellow-100':'bg-red-100'}">${h.Difficulty==1?'Dễ':h.Difficulty==2?'TB':'Khó'}</span></td>
-                <td class="p-4 font-black text-xl">${h.Score.toFixed(1)}</td>
+                <td class="p-4 text-center"><span class="text-[10px] font-black uppercase px-2 py-1 rounded-md ${h.Difficulty==1?'bg-green-100 text-green-700':h.Difficulty==2?'bg-yellow-100 text-yellow-700':'bg-red-100 text-red-700'}">${h.Difficulty==1?'Dễ':h.Difficulty==2?'TB':'Khó'}</span></td>
+                <td class="p-4 text-center font-black text-lg ${h.Score>=5?'text-green-600':'text-red-600'}">${h.Score.toFixed(1)}</td>
             </tr>`).join('');
         }
 
@@ -241,7 +278,6 @@
                 </div>`).join('');
         }
 
-        // HÀM MỚI DÀNH CHO GIẢNG VIÊN XEM LỊCH SỬ SINH VIÊN
         async function viewStudentHistory(studentId, studentName) {
             document.getElementById('shInfo').innerText = `Sinh viên: ${studentName}`;
             const tbody = document.getElementById('shBody');
