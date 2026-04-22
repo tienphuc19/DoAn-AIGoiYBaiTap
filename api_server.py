@@ -54,7 +54,7 @@ def get_exercise_details(ex_id: int):
     conn.close()
     return {"status": "success", "mota": mota, "yeucau": yeucau}
 
-# API CHẤM ĐIỂM AI
+# API CHẤM ĐIỂM AI (GEMINI-PRO)
 class MockGradeRequest(BaseModel):
     student_id: int
     exercise_id: int
@@ -106,14 +106,14 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
     except Exception as e: 
         raise HTTPException(status_code=500, detail=str(e))
 
-# THUẬT TOÁN GỢI Ý CỐT LÕI
+# THUẬT TOÁN GỢI Ý CỐT LÕI 
 class RecommendRequest(BaseModel):
     student_id: int
     top_k: int = 6
     subject_code: str = ""
 
 @app.post("/api/recommend", tags=["Sinh Viên"])
-def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header(None)):
+def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header(None, description="Bắt buộc nhập 'student'")):
     if x_user_role != "student": 
         raise HTTPException(status_code=403, detail="Cấm truy cập!")
     
@@ -122,24 +122,51 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     course_score_supa = 0.0
     supa_key = os.getenv("SUPABASE_KEY")
     
+    # 1. BỘ DÒ TÌM SUPABASE (ĐÃ FIX LỖI TÊN CỘT 'student')
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
+        
+        # Lấy Điểm Học Lực Chung
         try:
-            res_int = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
+            # Thử cột 'student' theo như ảnh chụp
+            res_int = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores", headers=headers, params={"student": f"eq.{request.student_id}"}, timeout=5)
+            
+            # Nếu lỗi (do bảng khác lại dùng student_id), lùi về thử 'student_id'
+            if res_int.status_code != 200:
+                res_int = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
+                
             if res_int.status_code == 200 and len(res_int.json()) > 0:
                 fixed_avg_score = float(res_int.json()[0].get('integrated_score', 0.0))
                 academic_rank = str(res_int.json()[0].get('classification', ''))
-            
+        except: 
+            pass
+
+        # Lấy Điểm Năng Lực Môn
+        try:
             map_subj = {"CTDLGT": "CTDL", "OOP": "OOP", "NMLT": "NMLT", "KTLT": "KTLT"}
-            res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{map_subj.get(request.subject_code, '')}"}, timeout=5)
+            supa_code = map_subj.get(request.subject_code, request.subject_code)
+            
+            # Thử cột 'student' và mã môn đã map
+            res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student": f"eq.{request.student_id}", "course_code": f"eq.{supa_code}"}, timeout=5)
+            
+            # Nếu lỗi, thử 'student_id'
+            if res_c.status_code != 200:
+                res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{supa_code}"}, timeout=5)
+                
+            # Nếu trả về rỗng, thử lại với mã môn gốc (VD: CTDLGT)
+            if res_c.status_code == 200 and len(res_c.json()) == 0:
+                 res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student": f"eq.{request.student_id}", "course_code": f"eq.{request.subject_code}"}, timeout=5)
+            
             if res_c.status_code == 200 and len(res_c.json()) > 0:
-                course_score_supa = float(res_c.json()[0].get('score', 0.0))
+                data_row = res_c.json()[0]
+                course_score_supa = float(data_row.get('score', data_row.get('course_score', data_row.get('diem', data_row.get('diem_mon', 0.0)))))
         except: 
             pass
 
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
     
+    # 2. Bộ lọc bài tập môn học
     if request.subject_code:
         if request.subject_code == 'OOP': pattern = 'OOP|LTHDT|Lập trình hướng đối tượng'
         elif request.subject_code == 'CTDLGT': pattern = 'CTDL|Cấu trúc dữ liệu'
@@ -154,20 +181,29 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     completed_df = student_history[student_history['Score'] >= 5.0]
     completed_ids = completed_df['ExerciseID'].tolist()
 
+    # 3. Tính Năng Lực Hiện Tại
     if len(completed_df) > 0:
         current_comp = float(completed_df['Score'].mean())
     else:
         current_comp = float(course_score_supa)
 
-    if current_comp >= 8.0: target_diff = 3.0
-    elif current_comp >= 6.0: target_diff = 2.0
-    else: target_diff = 1.0
+    # 4. Xác định Target Difficulty trực tiếp từ Điểm Năng Lực
+    if current_comp >= 8.0: target_diff = 3.0       
+    elif current_comp >= 6.0: target_diff = 2.0     
+    else: target_diff = 1.0                         
 
     candidate_ex = df_exercises[~df_exercises['ExerciseID'].isin(completed_ids)]
     
     if candidate_ex.empty: 
-        return {"status": "success", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "subject_score": round(current_comp, 1), "recommendations": []}
+        return {
+            "status": "success", 
+            "avg_score": fixed_avg_score, 
+            "academic_rank": academic_rank,
+            "subject_score": round(current_comp, 1), 
+            "recommendations": []
+        }
 
+    # 5. Thuật toán lọc dựa trên nội dung (CBF)
     tfidf = TfidfVectorizer()
     tf_matrix = tfidf.fit_transform(df_exercises['Tags'])
     cos_sim = cosine_similarity(tf_matrix, tf_matrix)
@@ -183,15 +219,24 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
         
         for _, r in candidate_ex.iterrows():
             penalty = abs(r['Difficulty'] - target_diff) * 0.4
-            final_list.append({"ex": r.to_dict(), "score": float(dict_cb.get(r['ExerciseID'], 0) - penalty)})
+            final_score = dict_cb.get(r['ExerciseID'], 0) - penalty
+            final_list.append({"ex": r.to_dict(), "score": float(final_score)})
     else:
         for _, r in candidate_ex.iterrows():
-            final_list.append({"ex": r.to_dict(), "score": float(1.0 / (abs(r['Difficulty'] - target_diff) + 1.0))})
+            final_score = 1.0 / (abs(r['Difficulty'] - target_diff) + 1.0)
+            final_list.append({"ex": r.to_dict(), "score": float(final_score)})
 
     sorted_res = sorted(final_list, key=lambda x: x['score'], reverse=True)
-    return {"status": "success", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "subject_score": round(current_comp, 1), "recommendations": [i['ex'] for i in sorted_res[:request.top_k]]}
+    
+    return {
+        "status": "success", 
+        "avg_score": fixed_avg_score, 
+        "academic_rank": academic_rank,
+        "subject_score": round(current_comp, 1), 
+        "recommendations": [i['ex'] for i in sorted_res[:request.top_k]]
+    }
 
-# API LỊCH SỬ (ĐÃ MỞ KHÓA CHO GIẢNG VIÊN)
+# API LỊCH SỬ
 @app.get("/api/history/{student_id}", tags=["Sinh Viên", "Giảng Viên"])
 def get_student_history(student_id: int, x_user_role: str = Header(None)):
     if x_user_role not in ["student", "teacher"]: 
@@ -214,7 +259,13 @@ def login_user(request: LoginRequest):
     conn.close()
     if df.empty: 
         return {"status": "error", "message": "Sai thông tin!"}
-    return {"status": "success", "role": df.iloc[0]['VaiTro'], "user_id": int(df.iloc[0]['MaNguoiDung']), "full_name": df.iloc[0]['HoTen'], "username": request.username}
+    return {
+        "status": "success", 
+        "role": df.iloc[0]['VaiTro'], 
+        "user_id": int(df.iloc[0]['MaNguoiDung']), 
+        "full_name": df.iloc[0]['HoTen'], 
+        "username": request.username
+    }
 
 # API GIẢNG VIÊN
 @app.get("/api/teacher/overview", tags=["Giảng Viên"])
