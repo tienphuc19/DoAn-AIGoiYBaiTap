@@ -35,6 +35,29 @@ def load_data_from_sql():
     except Exception as e: 
         raise HTTPException(status_code=500, detail=f"Lỗi SQL: {str(e)}")
 
+# =====================================================================
+# 🕵️ CÔNG CỤ ĐIỆP VIÊN - NỘI SOI DATABASE SUPABASE (NEW)
+# =====================================================================
+@app.get("/api/debug-supabase")
+def debug_supabase():
+    supa_url = os.getenv("SUPABASE_URL", "https://bxpugrlaosbemlfttrnk.supabase.co")
+    supa_key = os.getenv("SUPABASE_KEY")
+    if not supa_key: return {"error": "Chưa cài đặt SUPABASE_KEY trên Render"}
+    
+    headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
+    
+    try:
+        # Lấy thử 5 dòng đầu tiên trong bảng course_scores (Bỏ qua mọi bộ lọc)
+        res = requests.get(f"{supa_url}/rest/v1/course_scores?limit=5", headers=headers, timeout=5)
+        return {
+            "trang_thai_HTTP": res.status_code,
+            "thong_diep": "Nếu mảng du_lieu rỗng [], 100% là do Supabase đang BẬT BẢO MẬT RLS chặn API. Nếu có dữ liệu, hãy soi kỹ tên cột và mã môn!",
+            "du_lieu": res.json()
+        }
+    except Exception as e:
+        return {"error": str(e)}
+# =====================================================================
+
 @app.get("/api/exercise-details/{ex_id}", tags=["Sinh Viên"])
 def get_exercise_details(ex_id: int):
     conn = get_db_connection()
@@ -77,39 +100,29 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     
     fixed_avg_score = 0.0; academic_rank = "Chưa có điểm"; course_score_supa = 0.0
     
-    # URL cố định theo tin nhắn của bạn
     supa_url = os.getenv("SUPABASE_URL", "https://bxpugrlaosbemlfttrnk.supabase.co")
     supa_key = os.getenv("SUPABASE_KEY")
     
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
         
-        # 1. LẤY ĐIỂM HỌC LỰC CHUNG (Bảng integrated_scores)
         try:
             res_int = requests.get(f"{supa_url}/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
-            print(f"DEBUG Học lực: {res_int.status_code} - {res_int.text}") # In log ra Render
-            
             if res_int.status_code == 200 and len(res_int.json()) > 0:
                 data = res_int.json()[0]
                 fixed_avg_score = float(data.get('integrated_score', 0.0))
                 academic_rank = str(data.get('classification', ''))
-        except Exception as e: 
-            print(f"LỖI HTTP Học Lực: {str(e)}")
+        except Exception: pass
 
-        # 2. LẤY ĐIỂM NĂNG LỰC MÔN (Bảng course_scores)
         try:
             map_subj = {"CTDLGT": "CTDL", "OOP": "OOP", "NMLT": "NMLT", "KTLT": "KTLT"}
             target_code = map_subj.get(request.subject_code, request.subject_code)
             
             res_c = requests.get(f"{supa_url}/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{target_code}"}, timeout=5)
-            print(f"DEBUG Điểm môn {target_code}: {res_c.status_code} - {res_c.text}") # In log ra Render
-            
             if res_c.status_code == 200 and len(res_c.json()) > 0:
                 course_score_supa = float(res_c.json()[0].get('score', 0.0))
-        except Exception as e: 
-            print(f"LỖI HTTP Điểm Môn: {str(e)}")
+        except Exception: pass
 
-    # XỬ LÝ DỮ LIỆU BÀI TẬP (Giữ nguyên)
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
     if request.subject_code:
@@ -122,7 +135,6 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
 
     completed_ids = df_history[(df_history['StudentID'] == request.student_id) & (df_history['Score'] >= 5.0)]['ExerciseID'].tolist()
     
-    # ĐIỂM NĂNG LỰC TRỰC TIẾP TỪ SUPABASE
     current_comp = float(course_score_supa) if course_score_supa > 0 else float(fixed_avg_score)
     target_diff = 3.0 if current_comp >= 8.0 else (2.0 if current_comp >= 6.0 else 1.0)
     candidate_ex = df_exercises[~df_exercises['ExerciseID'].isin(completed_ids)]
