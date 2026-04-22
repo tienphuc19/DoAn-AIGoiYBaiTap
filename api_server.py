@@ -20,7 +20,7 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
 )
 
-# KẾT NỐI DATABASE
+# KẾT NỐI DATABASE SQL SERVER
 def get_db_connection():
     db_url = "mssql+pymssql://userPersonalizedSystem:123456789@118.69.126.49/Data_PersonalizedSystem"
     return create_engine(db_url).connect()
@@ -106,7 +106,7 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
     except Exception as e: 
         raise HTTPException(status_code=500, detail=str(e))
 
-# THUẬT TOÁN GỢI Ý CỐT LÕI 
+# THUẬT TOÁN GỢI Ý CỐT LÕI
 class RecommendRequest(BaseModel):
     student_id: int
     top_k: int = 6
@@ -120,53 +120,37 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     fixed_avg_score = 0.0
     academic_rank = "Chưa có điểm"
     course_score_supa = 0.0
-    supa_key = os.getenv("SUPABASE_KEY")
     
-    # 1. BỘ DÒ TÌM SUPABASE (ĐÃ FIX LỖI TÊN CỘT 'student')
+    # 1. GIAO TIẾP VỚI SUPABASE (DÙNG ĐÚNG CODE BẠN CUNG CẤP)
+    supa_key = os.getenv("SUPABASE_KEY")
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
         
         # Lấy Điểm Học Lực Chung
         try:
-            # Thử cột 'student' theo như ảnh chụp
-            res_int = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores", headers=headers, params={"student": f"eq.{request.student_id}"}, timeout=5)
-            
-            # Nếu lỗi (do bảng khác lại dùng student_id), lùi về thử 'student_id'
-            if res_int.status_code != 200:
-                res_int = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
-                
+            res_int = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
             if res_int.status_code == 200 and len(res_int.json()) > 0:
-                fixed_avg_score = float(res_int.json()[0].get('integrated_score', 0.0))
-                academic_rank = str(res_int.json()[0].get('classification', ''))
-        except: 
+                fixed_avg_score = round(float(res_int.json()[0].get('integrated_score', 0.0)), 1)
+                academic_rank = str(res_int.json()[0].get('classification', 'Chưa có điểm'))
+        except Exception: 
             pass
 
         # Lấy Điểm Năng Lực Môn
-        try:
-            map_subj = {"CTDLGT": "CTDL", "OOP": "OOP", "NMLT": "NMLT", "KTLT": "KTLT"}
-            supa_code = map_subj.get(request.subject_code, request.subject_code)
-            
-            # Thử cột 'student' và mã môn đã map
-            res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student": f"eq.{request.student_id}", "course_code": f"eq.{supa_code}"}, timeout=5)
-            
-            # Nếu lỗi, thử 'student_id'
-            if res_c.status_code != 200:
-                res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{supa_code}"}, timeout=5)
-                
-            # Nếu trả về rỗng, thử lại với mã môn gốc (VD: CTDLGT)
-            if res_c.status_code == 200 and len(res_c.json()) == 0:
-                 res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student": f"eq.{request.student_id}", "course_code": f"eq.{request.subject_code}"}, timeout=5)
-            
-            if res_c.status_code == 200 and len(res_c.json()) > 0:
-                data_row = res_c.json()[0]
-                course_score_supa = float(data_row.get('score', data_row.get('course_score', data_row.get('diem', data_row.get('diem_mon', 0.0)))))
-        except: 
-            pass
+        map_subject = {"CTDLGT": "CTDL", "OOP": "OOP", "NMLT": "NMLT", "KTLT": "KTLT"}
+        supa_subject_code = map_subject.get(request.subject_code, request.subject_code)
+        
+        if request.subject_code:
+            try:
+                res_course = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{supa_subject_code}"}, timeout=5)
+                if res_course.status_code == 200 and len(res_course.json()) > 0:
+                    course_score_supa = float(res_course.json()[0].get('score', 0.0))
+            except Exception: 
+                pass
 
+    # 2. XỬ LÝ DỮ LIỆU TỪ SQL SERVER CỦA BẠN
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
     
-    # 2. Bộ lọc bài tập môn học
     if request.subject_code:
         if request.subject_code == 'OOP': pattern = 'OOP|LTHDT|Lập trình hướng đối tượng'
         elif request.subject_code == 'CTDLGT': pattern = 'CTDL|Cấu trúc dữ liệu'
@@ -181,7 +165,7 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     completed_df = student_history[student_history['Score'] >= 5.0]
     completed_ids = completed_df['ExerciseID'].tolist()
 
-    # 3. Tính Năng Lực Hiện Tại
+    # 3. Tính Năng Lực Hiện Tại (Tuyệt đối chỉ lấy AI chấm hoặc Supabase)
     if len(completed_df) > 0:
         current_comp = float(completed_df['Score'].mean())
     else:
