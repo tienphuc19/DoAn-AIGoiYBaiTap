@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập")
+app = FastAPI(title="Hệ Thống Gợi Ý Bài Tập AI - Tối Giản")
 
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
@@ -49,9 +49,7 @@ def get_exercise_details(ex_id: int):
     return {"status": "success", "mota": mota, "yeucau": yeucau}
 
 class MockGradeRequest(BaseModel):
-    student_id: int
-    exercise_id: int
-    submitted_work: str = "" 
+    student_id: int; exercise_id: int; submitted_work: str = "" 
 
 @app.post("/api/mock-grade-and-submit", tags=["Sinh Viên"])
 def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header(None)):
@@ -60,12 +58,10 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
         conn = get_db_connection()
         final_grade = round(random.uniform(5.5, 9.5), 1)
         feedback = {"criteria_eval": "Hệ thống tự động ghi nhận bài làm thành công.", "strengths": "Cấu trúc hợp lệ.", "weaknesses": "Cần tối ưu thuật toán."}
-
         query_upsert = text("""
             IF EXISTS (SELECT 1 FROM AI_LichSuLamBai WHERE MaSinhVien = :sv_id AND MaBaiTap = :ex_id)
                 UPDATE AI_LichSuLamBai SET DiemSo = :grade WHERE MaSinhVien = :sv_id AND MaBaiTap = :ex_id
-            ELSE
-                INSERT INTO AI_LichSuLamBai (MaSinhVien, MaBaiTap, DiemSo) VALUES (:sv_id, :ex_id, :grade)
+            ELSE INSERT INTO AI_LichSuLamBai (MaSinhVien, MaBaiTap, DiemSo) VALUES (:sv_id, :ex_id, :grade)
         """)
         conn.execute(query_upsert, {"sv_id": request.student_id, "ex_id": request.exercise_id, "grade": final_grade})
         conn.commit(); conn.close()
@@ -73,61 +69,61 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
 class RecommendRequest(BaseModel):
-    student_id: int
-    top_k: int = 6
-    subject_code: str = ""
+    student_id: int; top_k: int = 6; subject_code: str = ""
 
 @app.post("/api/recommend", tags=["Sinh Viên"])
 def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header(None)):
     if x_user_role != "student": raise HTTPException(status_code=403)
     
-    fixed_avg_score = 0.0
-    academic_rank = "Chưa có điểm"
-    course_score_supa = 0.0
+    fixed_avg_score = 0.0; academic_rank = "Chưa có điểm"; course_score_supa = 0.0
+    
+    # URL cố định theo tin nhắn của bạn
+    supa_url = os.getenv("SUPABASE_URL", "https://bxpugrlaosbemlfttrnk.supabase.co")
     supa_key = os.getenv("SUPABASE_KEY")
     
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
-        # Lấy Điểm Tổng
+        
+        # 1. LẤY ĐIỂM HỌC LỰC CHUNG (Bảng integrated_scores)
         try:
-            res_int = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores", headers=headers, params={"student": f"eq.{request.student_id}"}, timeout=5)
-            if res_int.status_code != 200:
-                res_int = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
+            res_int = requests.get(f"{supa_url}/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
+            print(f"DEBUG Học lực: {res_int.status_code} - {res_int.text}") # In log ra Render
             
             if res_int.status_code == 200 and len(res_int.json()) > 0:
                 data = res_int.json()[0]
-                fixed_avg_score = float(data.get('integrated_score', data.get('total_score', 0.0)))
+                fixed_avg_score = float(data.get('integrated_score', 0.0))
                 academic_rank = str(data.get('classification', ''))
-        except: pass
+        except Exception as e: 
+            print(f"LỖI HTTP Học Lực: {str(e)}")
 
-        # Lấy Điểm Môn Học
+        # 2. LẤY ĐIỂM NĂNG LỰC MÔN (Bảng course_scores)
         try:
             map_subj = {"CTDLGT": "CTDL", "OOP": "OOP", "NMLT": "NMLT", "KTLT": "KTLT"}
             target_code = map_subj.get(request.subject_code, request.subject_code)
             
-            res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
-            if res_c.status_code != 200:
-                res_c = requests.get("https://bxpugrlaosbemlfttrnk.supabase.co/rest/v1/course_scores", headers=headers, params={"student": f"eq.{request.student_id}"}, timeout=5)
+            res_c = requests.get(f"{supa_url}/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{target_code}"}, timeout=5)
+            print(f"DEBUG Điểm môn {target_code}: {res_c.status_code} - {res_c.text}") # In log ra Render
             
-            if res_c.status_code == 200:
-                for item in res_c.json():
-                    if str(item.get('course_code', '')).strip().upper() in [target_code, request.subject_code]:
-                        course_score_supa = float(item.get('score', item.get('course_score', item.get('diem', item.get('diem_mon', 0.0)))))
-                        break
-        except: pass
+            if res_c.status_code == 200 and len(res_c.json()) > 0:
+                course_score_supa = float(res_c.json()[0].get('score', 0.0))
+        except Exception as e: 
+            print(f"LỖI HTTP Điểm Môn: {str(e)}")
 
+    # XỬ LÝ DỮ LIỆU BÀI TẬP (Giữ nguyên)
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
-    
     if request.subject_code:
-        pattern = 'OOP|LTHDT' if request.subject_code == 'OOP' else ('CTDL' if request.subject_code == 'CTDLGT' else ('NMLT' if request.subject_code == 'NMLT' else ('KTLT' if request.subject_code == 'KTLT' else request.subject_code)))
+        if request.subject_code == 'OOP': pattern = 'OOP|LTHDT|Lập trình hướng đối tượng'
+        elif request.subject_code == 'CTDLGT': pattern = 'CTDL|Cấu trúc dữ liệu'
+        elif request.subject_code == 'NMLT': pattern = 'NMLT|Nhập môn lập trình'
+        elif request.subject_code == 'KTLT': pattern = 'KTLT|Kỹ thuật lập trình'
+        else: pattern = request.subject_code
         df_exercises = df_exercises[df_exercises['SubjectCode'].str.contains(pattern, case=False, na=False)].reset_index(drop=True)
 
     completed_ids = df_history[(df_history['StudentID'] == request.student_id) & (df_history['Score'] >= 5.0)]['ExerciseID'].tolist()
-
-    # KHÓA CỨNG: Tuyệt đối chỉ lấy điểm riêng của môn học từ Supabase
-    current_comp = float(course_score_supa)
-
+    
+    # ĐIỂM NĂNG LỰC TRỰC TIẾP TỪ SUPABASE
+    current_comp = float(course_score_supa) if course_score_supa > 0 else float(fixed_avg_score)
     target_diff = 3.0 if current_comp >= 8.0 else (2.0 if current_comp >= 6.0 else 1.0)
     candidate_ex = df_exercises[~df_exercises['ExerciseID'].isin(completed_ids)]
     
@@ -143,18 +139,24 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
         if type(scores_cb) != list and scores_cb.max() > scores_cb.min(): scores_cb = (scores_cb - scores_cb.min()) / (scores_cb.max() - scores_cb.min())
         dict_cb = {df_exercises.iloc[idx]['ExerciseID']: scores_cb[idx] for idx in df_exercises.index}
         for _, r in candidate_ex.iterrows():
-            final_list.append({"ex": r.to_dict(), "score": float(dict_cb.get(r['ExerciseID'], 0) - abs(r['Difficulty'] - target_diff) * 0.4)})
+            penalty = abs(r['Difficulty'] - target_diff) * 0.4
+            final_list.append({"ex": r.to_dict(), "score": float(dict_cb.get(r['ExerciseID'], 0) - penalty)})
     else:
         for _, r in candidate_ex.iterrows():
             final_list.append({"ex": r.to_dict(), "score": float(1.0 / (abs(r['Difficulty'] - target_diff) + 1.0))})
 
-    return {"status": "success", "avg_score": fixed_avg_score, "academic_rank": academic_rank, "subject_score": round(current_comp, 1), "recommendations": [i['ex'] for i in sorted(final_list, key=lambda x: x['score'], reverse=True)[:request.top_k]]}
+    sorted_res = sorted(final_list, key=lambda x: x['score'], reverse=True)
+    return {
+        "status": "success", "avg_score": fixed_avg_score, "academic_rank": academic_rank,
+        "subject_score": round(current_comp, 1), "recommendations": [i['ex'] for i in sorted_res[:request.top_k]]
+    }
 
-@app.get("/api/history/{student_id}", tags=["Lịch Sử"])
+@app.get("/api/history/{student_id}", tags=["Sinh Viên", "Giảng Viên"])
 def get_student_history(student_id: int, x_user_role: str = Header(None)):
     if x_user_role not in ["student", "teacher"]: raise HTTPException(status_code=403)
     conn = get_db_connection()
-    df = pd.read_sql(text("SELECT h.MaBaiTap AS ExerciseID, b.TenBaiTap AS Title, h.DiemSo AS Score, ISNULL(b.MaDoKho, 1) AS Difficulty FROM AI_LichSuLamBai h JOIN BAITAP b ON h.MaBaiTap = b.Id WHERE h.MaSinhVien = :sv_id ORDER BY h.DiemSo DESC"), conn, params={"sv_id": student_id})
+    query = text("SELECT h.MaBaiTap AS ExerciseID, b.TenBaiTap AS Title, h.DiemSo AS Score, ISNULL(b.MaDoKho, 1) AS Difficulty FROM AI_LichSuLamBai h JOIN BAITAP b ON h.MaBaiTap = b.Id WHERE h.MaSinhVien = :sv_id ORDER BY h.DiemSo DESC")
+    df = pd.read_sql(query, conn, params={"sv_id": student_id})
     conn.close()
     return {"status": "success", "history": df.to_dict(orient="records")}
 
@@ -175,8 +177,14 @@ def get_teacher_overview(x_user_role: str = Header(None)):
     df_diem = pd.read_sql("SELECT MaSinhVien, DiemSo FROM AI_LichSuLamBai", conn)
     conn.close()
     df_sv['Lop'] = df_sv['HoTen'].str.extract(r'\((.*?)\)')[0].fillna('Chưa rõ')
-    df_sv = pd.merge(df_sv, df_diem[df_diem['DiemSo'] < 5.0].groupby('MaSinhVien').size().reset_index(name='f'), left_on='MaNguoiDung', right_on='MaSinhVien', how='left').fillna(0)
-    return {"status": "success", "weak_students_count": int((df_sv['f'] > 0).sum()), "classes": [{"class_name": n, "student_count": len(g), "students": g.apply(lambda r: {"user_id": int(r['MaNguoiDung']), "username": r['TenDangNhap'], "fullname": r['HoTen'], "failed_count": int(r['f'])}, axis=1).tolist()} for n, g in df_sv.groupby('Lop')]}
+    failed = df_diem[df_diem['DiemSo'] < 5.0].groupby('MaSinhVien').size().reset_index(name='f')
+    df_sv = pd.merge(df_sv, failed, left_on='MaNguoiDung', right_on='MaSinhVien', how='left').fillna(0)
+    classes = []
+    for name, gp in df_sv.groupby('Lop'):
+        sts = gp.apply(lambda r: {"user_id": int(r['MaNguoiDung']), "username": r['TenDangNhap'], "fullname": r['HoTen'], "failed_count": int(r['f'])}, axis=1).tolist()
+        classes.append({"class_name": name, "student_count": len(sts), "students": sts})
+    return {"status": "success", "weak_students_count": int((df_sv['f'] > 0).sum()), "classes": classes}
 
 @app.get("/")
+@app.head("/")
 def serve_frontend(): return FileResponse("index.html") if os.path.exists("index.html") else {"m": "No index.html"}
