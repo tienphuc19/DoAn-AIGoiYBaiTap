@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>AI LEARNING - Hệ Thống Gợi Ý Bài Tập</title>
+    <title>AI LEARNING - Hệ Thống Gợi Ý Thông Minh</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -19,7 +19,7 @@
             <div class="text-center mb-8"><i class="fas fa-robot text-5xl text-blue-600 mb-2"></i><h2 class="text-3xl font-black text-blue-900">AI LOGIN</h2></div>
             <input type="text" id="username" class="w-full mb-4 p-4 border rounded-xl" placeholder="Tên đăng nhập">
             <input type="password" id="password" class="w-full mb-6 p-4 border rounded-xl" placeholder="Mật khẩu">
-            <button onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-xl font-bold hover:bg-blue-700">Đăng Nhập </button>
+            <button onclick="login()" class="w-full bg-blue-600 text-white p-4 rounded-xl font-bold hover:bg-blue-700">VÀO HỆ THỐNG</button>
         </div>
     </div>
 
@@ -93,7 +93,7 @@
         <div class="bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
             <div class="bg-blue-600 p-6 text-white flex justify-between items-center">
                 <div><h2 id="mTitle" class="text-2xl font-black">---</h2><p id="mInfo" class="opacity-70 text-sm">---</p></div>
-                <button onclick="closeEx()" class="text-3xl">&times;</button>
+                <button onclick="closeEx()" class="text-3xl hover:text-red-200 transition">&times;</button>
             </div>
             <div class="p-8 overflow-y-auto space-y-6 flex-1">
                 <div class="bg-gray-50 p-6 rounded-2xl border">
@@ -202,24 +202,17 @@
             document.getElementById('mDesc').innerHTML = `<b>Yêu cầu:</b> ${data.yeucau}<br><br><b>Mô tả:</b> ${data.mota}`;
         }
 
-        // --- HÀM MỚI: XỬ LÝ KHI CHỌN FILE CODE ---
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            // Đọc nội dung file dưới dạng text
             const reader = new FileReader();
             reader.onload = function(e) {
-                // Đổ text vào khung soạn thảo
                 document.getElementById('mCode').value = e.target.result;
-                
-                // Hiển thị tên file cho sinh viên biết là đã tải thành công
                 document.getElementById('fileNameDisplay').classList.remove('hidden');
                 document.getElementById('fName').innerText = file.name;
             };
             reader.readAsText(file);
-            
-            // Reset input để nếu xóa code đi muốn chọn lại file cũ vẫn nhận
             event.target.value = '';
         }
 
@@ -305,6 +298,11 @@
 
         function closeStudentHistory() {
             document.getElementById('studentHistoryModal').classList.add('hidden');
+        }
+
+        // HÀM ĐÓNG MODAL NỘP BÀI ĐÃ ĐƯỢC THÊM LẠI Ở ĐÂY
+        function closeEx() {
+            document.getElementById('exModal').classList.add('hidden');
         }
     </script>
 </body>
