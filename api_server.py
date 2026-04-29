@@ -35,6 +35,33 @@ def load_data_from_sql():
     except Exception as e: 
         raise HTTPException(status_code=500, detail=f"Lỗi SQL: {str(e)}")
 
+# =================================================================
+# 🔍 CÔNG CỤ X-QUANG KIỂM TRA DỮ LIỆU TỪNG SINH VIÊN
+# =================================================================
+@app.get("/api/test-diem/{student_id}", tags=["Debug"])
+def test_diem_supabase(student_id: int):
+    supa_url = os.getenv("SUPABASE_URL", "https://bxpugrlaosbemlfttrnk.supabase.co")
+    supa_key = os.getenv("SUPABASE_KEY")
+    if not supa_key: return {"error": "Chưa cài đặt SUPABASE_KEY trên Render"}
+
+    headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
+    
+    # Kéo bảng Học Lực
+    res1 = requests.get(f"{supa_url}/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{student_id}"})
+    if res1.status_code != 200 or len(res1.json()) == 0:
+        res1 = requests.get(f"{supa_url}/rest/v1/integrated_scores", headers=headers, params={"student": f"eq.{student_id}"})
+    
+    # Kéo bảng Môn Học
+    res2 = requests.get(f"{supa_url}/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{student_id}"})
+
+    return {
+        "1. Mã Sinh Viên Đang Test": student_id,
+        "2. Dữ liệu bảng Học Lực (integrated_scores)": res1.json() if res1.status_code == 200 else str(res1.text),
+        "3. Dữ liệu bảng Điểm Môn (course_scores)": res2.json() if res2.status_code == 200 else str(res2.text),
+        "Kết luận": "Nếu phần 3 hiện mảng rỗng [], nghĩa là nhóm kia CHƯA NHẬP điểm môn cho sinh viên này!"
+    }
+# =================================================================
+
 @app.get("/api/exercise-details/{ex_id}", tags=["Sinh Viên"])
 def get_exercise_details(ex_id: int):
     conn = get_db_connection()
@@ -83,23 +110,33 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
         
-        # 1. LẤY ĐIỂM HỌC LỰC CHUNG
+        # 1. LẤY ĐIỂM HỌC LỰC CHUNG (Thử cả 2 cột student và student_id)
         try:
             res_int = requests.get(f"{supa_url}/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
+            if res_int.status_code != 200 or len(res_int.json()) == 0:
+                res_int = requests.get(f"{supa_url}/rest/v1/integrated_scores", headers=headers, params={"student": f"eq.{request.student_id}"}, timeout=5)
+                
             if res_int.status_code == 200 and len(res_int.json()) > 0:
                 data = res_int.json()[0]
                 fixed_avg_score = float(data.get('integrated_score', 0.0))
                 academic_rank = str(data.get('classification', ''))
         except Exception: pass
 
-        # 2. LẤY ĐIỂM NĂNG LỰC MÔN
+        # 2. LẤY ĐIỂM NĂNG LỰC MÔN (Thuật toán vớt dữ liệu chống lỗi khoảng trắng)
         try:
             map_subj = {"CTDLGT": "CTDL", "OOP": "OOP", "NMLT": "NMLT", "KTLT": "KTLT"}
             target_code = map_subj.get(request.subject_code, request.subject_code)
             
-            res_c = requests.get(f"{supa_url}/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}", "course_code": f"eq.{target_code}"}, timeout=5)
+            # Kéo TẤT CẢ điểm các môn của SV này về thay vì lọc trực tiếp trên API
+            res_c = requests.get(f"{supa_url}/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
+            
             if res_c.status_code == 200 and len(res_c.json()) > 0:
-                course_score_supa = float(res_c.json()[0].get('score', 0.0))
+                # Duyệt bằng Python để dọn sạch khoảng trắng
+                for item in res_c.json():
+                    db_code = str(item.get('course_code', '')).strip().upper()
+                    if db_code == target_code.upper():
+                        course_score_supa = float(item.get('score', 0.0))
+                        break
         except Exception: pass
 
     # XỬ LÝ DỮ LIỆU BÀI TẬP
@@ -116,13 +153,11 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     completed_df = df_history[(df_history['StudentID'] == request.student_id) & (df_history['Score'] >= 5.0)]
     completed_ids = completed_df['ExerciseID'].tolist()
     
-    # SỬA LỖI ĐIỂM TẠI ĐÂY: Tuyệt đối không mượn điểm Học lực chung
     if len(completed_df) > 0:
         current_comp = float(completed_df['Score'].mean())
     else:
-        current_comp = float(course_score_supa) # Nếu Supabase trả về 0.0 thì chấp nhận là 0.0
+        current_comp = float(course_score_supa)
 
-    # Tính toán độ khó
     target_diff = 3.0 if current_comp >= 8.0 else (2.0 if current_comp >= 6.0 else 1.0)
     candidate_ex = df_exercises[~df_exercises['ExerciseID'].isin(completed_ids)]
     
@@ -187,3 +222,4 @@ def get_teacher_overview(x_user_role: str = Header(None)):
 @app.get("/")
 @app.head("/")
 def serve_frontend(): return FileResponse("index.html") if os.path.exists("index.html") else {"m": "No index.html"}
+    
