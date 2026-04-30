@@ -35,9 +35,6 @@ def load_data_from_sql():
     except Exception as e: 
         raise HTTPException(status_code=500, detail=f"Lỗi SQL: {str(e)}")
 
-# =================================================================
-# 🔍 CÔNG CỤ X-QUANG KIỂM TRA DỮ LIỆU TỪNG SINH VIÊN
-# =================================================================
 @app.get("/api/test-diem/{student_id}", tags=["Debug"])
 def test_diem_supabase(student_id: int):
     supa_url = os.getenv("SUPABASE_URL", "https://bxpugrlaosbemlfttrnk.supabase.co")
@@ -46,12 +43,10 @@ def test_diem_supabase(student_id: int):
 
     headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
     
-    # Kéo bảng Học Lực
     res1 = requests.get(f"{supa_url}/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{student_id}"})
     if res1.status_code != 200 or len(res1.json()) == 0:
         res1 = requests.get(f"{supa_url}/rest/v1/integrated_scores", headers=headers, params={"student": f"eq.{student_id}"})
     
-    # Kéo bảng Môn Học
     res2 = requests.get(f"{supa_url}/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{student_id}"})
 
     return {
@@ -60,7 +55,6 @@ def test_diem_supabase(student_id: int):
         "3. Dữ liệu bảng Điểm Môn (course_scores)": res2.json() if res2.status_code == 200 else str(res2.text),
         "Kết luận": "Nếu phần 3 hiện mảng rỗng [], nghĩa là nhóm kia CHƯA NHẬP điểm môn cho sinh viên này!"
     }
-# =================================================================
 
 @app.get("/api/exercise-details/{ex_id}", tags=["Sinh Viên"])
 def get_exercise_details(ex_id: int):
@@ -110,7 +104,6 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     if supa_key:
         headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
         
-        # 1. LẤY ĐIỂM HỌC LỰC CHUNG (Thử cả 2 cột student và student_id)
         try:
             res_int = requests.get(f"{supa_url}/rest/v1/integrated_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
             if res_int.status_code != 200 or len(res_int.json()) == 0:
@@ -122,16 +115,13 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
                 academic_rank = str(data.get('classification', ''))
         except Exception: pass
 
-        # 2. LẤY ĐIỂM NĂNG LỰC MÔN (Thuật toán vớt dữ liệu chống lỗi khoảng trắng)
         try:
             map_subj = {"CTDLGT": "CTDL", "OOP": "OOP", "NMLT": "NMLT", "KTLT": "KTLT"}
             target_code = map_subj.get(request.subject_code, request.subject_code)
             
-            # Kéo TẤT CẢ điểm các môn của SV này về thay vì lọc trực tiếp trên API
             res_c = requests.get(f"{supa_url}/rest/v1/course_scores", headers=headers, params={"student_id": f"eq.{request.student_id}"}, timeout=5)
             
             if res_c.status_code == 200 and len(res_c.json()) > 0:
-                # Duyệt bằng Python để dọn sạch khoảng trắng
                 for item in res_c.json():
                     db_code = str(item.get('course_code', '')).strip().upper()
                     if db_code == target_code.upper():
@@ -139,7 +129,7 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
                         break
         except Exception: pass
 
-    # XỬ LÝ DỮ LIỆU BÀI TẬP
+    # Lọc bài tập theo môn học
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
     if request.subject_code:
@@ -150,9 +140,18 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
         else: pattern = request.subject_code
         df_exercises = df_exercises[df_exercises['SubjectCode'].str.contains(pattern, case=False, na=False)].reset_index(drop=True)
 
-    completed_df = df_history[(df_history['StudentID'] == request.student_id) & (df_history['Score'] >= 5.0)]
+    # ĐÂY LÀ ĐOẠN ĐÃ ĐƯỢC SỬA LẠI:
+    # 1. Lấy danh sách ID các bài tập CỦA MÔN NÀY
+    subject_exercise_ids = df_exercises['ExerciseID'].tolist()
+    
+    # 2. Lọc lịch sử: Chỉ lấy bài của sinh viên này VÀ thuộc môn học này
+    student_history = df_history[(df_history['StudentID'] == request.student_id) & (df_history['ExerciseID'].isin(subject_exercise_ids))]
+    
+    # 3. Lọc ra các bài đã đậu (>= 5.0) trong môn này
+    completed_df = student_history[student_history['Score'] >= 5.0]
     completed_ids = completed_df['ExerciseID'].tolist()
     
+    # Tính điểm năng lực môn: Chỉ trung bình cộng các bài CỦA MÔN NÀY
     if len(completed_df) > 0:
         current_comp = float(completed_df['Score'].mean())
     else:
@@ -222,4 +221,3 @@ def get_teacher_overview(x_user_role: str = Header(None)):
 @app.get("/")
 @app.head("/")
 def serve_frontend(): return FileResponse("index.html") if os.path.exists("index.html") else {"m": "No index.html"}
-    
