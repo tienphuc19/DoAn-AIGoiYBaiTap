@@ -129,7 +129,6 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
                         break
         except Exception: pass
 
-    # Lọc bài tập theo môn học
     df_exercises, df_history = load_data_from_sql()
     df_exercises['Tags'] = df_exercises['Tags'].fillna('')
     if request.subject_code:
@@ -140,18 +139,12 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
         else: pattern = request.subject_code
         df_exercises = df_exercises[df_exercises['SubjectCode'].str.contains(pattern, case=False, na=False)].reset_index(drop=True)
 
-    # ĐÂY LÀ ĐOẠN ĐÃ ĐƯỢC SỬA LẠI:
-    # 1. Lấy danh sách ID các bài tập CỦA MÔN NÀY
     subject_exercise_ids = df_exercises['ExerciseID'].tolist()
-    
-    # 2. Lọc lịch sử: Chỉ lấy bài của sinh viên này VÀ thuộc môn học này
     student_history = df_history[(df_history['StudentID'] == request.student_id) & (df_history['ExerciseID'].isin(subject_exercise_ids))]
     
-    # 3. Lọc ra các bài đã đậu (>= 5.0) trong môn này
     completed_df = student_history[student_history['Score'] >= 5.0]
     completed_ids = completed_df['ExerciseID'].tolist()
     
-    # Tính điểm năng lực môn: Chỉ trung bình cộng các bài CỦA MÔN NÀY
     if len(completed_df) > 0:
         current_comp = float(completed_df['Score'].mean())
     else:
@@ -201,6 +194,43 @@ def login_user(request: LoginRequest):
     conn.close()
     if df.empty: return {"status": "error", "message": "Sai thông tin!"}
     return {"status": "success", "role": df.iloc[0]['VaiTro'], "user_id": int(df.iloc[0]['MaNguoiDung']), "full_name": df.iloc[0]['HoTen'], "username": request.username}
+
+# =======================================================
+# 🔐 TÍNH NĂNG MỚI: ĐỔI MẬT KHẨU
+# =======================================================
+class ChangePasswordRequest(BaseModel):
+    user_id: int
+    old_password: str
+    new_password: str
+
+@app.post("/api/change-password", tags=["Hệ Thống"])
+def change_password(request: ChangePasswordRequest, x_user_role: str = Header(None)):
+    if not x_user_role: raise HTTPException(status_code=401)
+    
+    conn = get_db_connection()
+    try:
+        # 1. Kiểm tra mật khẩu cũ
+        query_check = text("SELECT MatKhau FROM TAIKHOAN WHERE MaNguoiDung = :uid")
+        df = pd.read_sql(query_check, conn, params={"uid": request.user_id})
+        
+        if df.empty:
+            return {"status": "error", "message": "Không tìm thấy tài khoản!"}
+            
+        current_db_password = str(df.iloc[0]['MatKhau']).strip()
+        if current_db_password != request.old_password:
+            return {"status": "error", "message": "Mật khẩu cũ không chính xác!"}
+            
+        # 2. Cập nhật mật khẩu mới
+        query_update = text("UPDATE TAIKHOAN SET MatKhau = :new_pw WHERE MaNguoiDung = :uid")
+        conn.execute(query_update, {"new_pw": request.new_password, "uid": request.user_id})
+        conn.commit()
+        
+        return {"status": "success", "message": "Đổi mật khẩu thành công!"}
+    except Exception as e:
+        return {"status": "error", "message": f"Lỗi hệ thống: {str(e)}"}
+    finally:
+        conn.close()
+# =======================================================
 
 @app.get("/api/teacher/overview", tags=["Giảng Viên"])
 def get_teacher_overview(x_user_role: str = Header(None)):
