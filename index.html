@@ -307,3 +307,70 @@
     </script>
 </body>
 </html>
+// ====== SCRIPT ĐỔI MẬT KHẨU ======
+function openChangePwModal() {
+    document.getElementById('changePwModal').style.display = 'block';
+    document.getElementById('oldPwInput').value = '';
+    document.getElementById('newPwInput').value = '';
+    document.getElementById('confirmPwInput').value = '';
+    document.getElementById('pwMessage').innerText = '';
+}
+
+function closeChangePwModal() {
+    document.getElementById('changePwModal').style.display = 'none';
+}
+
+async function submitChangePw() {
+    const oldPw = document.getElementById('oldPwInput').value;
+    const newPw = document.getElementById('newPwInput').value;
+    const confirmPw = document.getElementById('confirmPwInput').value;
+    const msgEl = document.getElementById('pwMessage');
+
+    if (!oldPw || !newPw || !confirmPw) {
+        msgEl.innerText = "Vui lòng nhập đầy đủ thông tin!";
+        msgEl.style.color = "red";
+        return;
+    }
+    if (newPw !== confirmPw) {
+        msgEl.innerText = "Mật khẩu mới không khớp!";
+        msgEl.style.color = "red";
+        return;
+    }
+
+    const userId = localStorage.getItem('user_id');
+    const userRole = localStorage.getItem('user_role');
+
+    try {
+        const response = await fetch('/api/change-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-user-role': userRole
+            },
+            body: JSON.stringify({
+                user_id: parseInt(userId),
+                old_password: oldPw,
+                new_password: newPw
+            })
+        });
+
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            msgEl.innerText = data.message;
+            msgEl.style.color = "green";
+            setTimeout(() => {
+                closeChangePwModal();
+                alert("Đổi mật khẩu thành công! Vui lòng đăng nhập lại.");
+                // Tùy chọn: gọi hàm đăng xuất của bạn ở đây (ví dụ: logout())
+                location.reload(); 
+            }, 1500);
+        } else {
+            msgEl.innerText = data.message;
+            msgEl.style.color = "red";
+        }
+    } catch (error) {
+        msgEl.innerText = "Lỗi kết nối máy chủ!";
+        msgEl.style.color = "red";
+    }
+}
