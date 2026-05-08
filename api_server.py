@@ -9,6 +9,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 import os
 import requests
 import random
+import json
+import google.generativeai as genai  # <-- THƯ VIỆN GEMINI MỚI THÊM
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -72,22 +74,86 @@ def get_exercise_details(ex_id: int):
 class MockGradeRequest(BaseModel):
     student_id: int; exercise_id: int; submitted_work: str = "" 
 
+# ==============================================================================
+# ĐÂY LÀ PHẦN ĐÃ NÂNG CẤP: TÍCH HỢP GEMINI VÀO CHẤM CODE THỰC TẾ
+# ==============================================================================
 @app.post("/api/mock-grade-and-submit", tags=["Sinh Viên"])
 def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header(None)):
     if x_user_role != "student": raise HTTPException(status_code=403)
+    
+    # Kiểm tra nếu sinh viên nộp code trắng hoặc quá ngắn
+    if not request.submitted_work or len(request.submitted_work.strip()) < 5:
+        return {"status": "error", "message": "Code quá ngắn hoặc trống, vui lòng viết code đàng hoàng!"}
+
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
-        final_grade = round(random.uniform(5.5, 9.5), 1)
-        feedback = {"criteria_eval": "Hệ thống tự động ghi nhận bài làm thành công.", "strengths": "Cấu trúc hợp lệ.", "weaknesses": "Cần tối ưu thuật toán."}
+        # 1. Kéo đề bài từ SQL Server lên để Gemini biết đường chấm
+        df_bt = pd.read_sql(f"SELECT TenBaiTap, MoTa, YeuCau FROM BAITAP WHERE Id = {request.exercise_id}", conn)
+        if df_bt.empty:
+            raise Exception("Không tìm thấy bài tập!")
+            
+        ten_bt = str(df_bt.iloc[0]['TenBaiTap'])
+        mota = str(df_bt.iloc[0]['MoTa'])
+        yeucau = str(df_bt.iloc[0]['YeuCau'])
+
+        # 2. Cấu hình Gemini bằng API Key của bạn
+        genai.configure(api_key="AIzaSyDhRK9jFo69jzzB_LuVFA26Bg7HvzUb6ic")
+        # Sử dụng model gemini-1.5-flash để tốc độ phản hồi cực nhanh
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # 3. Viết Prompt ép Gemini đóng vai giảng viên chấm bài và trả về JSON
+        prompt = f"""
+        Bạn là một giảng viên chấm thi môn Lập trình cực kỳ nghiêm khắc nhưng công tâm.
+        Hãy chấm điểm đoạn code của sinh viên dựa trên thông tin đề bài sau:
+        - Tên bài: {ten_bt}
+        - Mô tả: {mota}
+        - Yêu cầu: {yeucau}
+
+        ĐÂY LÀ CODE CỦA SINH VIÊN:
+        ```
+        {request.submitted_work}
+        ```
+
+        Nhiệm vụ của bạn: Đọc code, xem có đúng logic và yêu cầu không. Chấm trên thang điểm 10.
+        BẠN CHỈ ĐƯỢC PHÉP TRẢ VỀ DUY NHẤT MỘT CHUỖI JSON ĐÚNG ĐỊNH DẠNG DƯỚI ĐÂY, TUYỆT ĐỐI KHÔNG GIẢI THÍCH HAY VIẾT THÊM BẤT KỲ CHỮ NÀO KHÁC:
+        {{
+            "score": [Điểm số, ví dụ 8.5],
+            "strengths": "[1 câu ngắn khen ngợi hoặc chỉ ra điểm đúng của code]",
+            "weaknesses": "[1 câu ngắn chỉ ra lỗi sai, lỗi biên dịch, hoặc chỗ cần tối ưu]"
+        }}
+        """
+
+        # 4. Gửi đề bài & code cho Gemini
+        response = model.generate_content(prompt)
+        
+        # 5. Xử lý chuỗi JSON do Gemini trả về (đề phòng nó bọc trong ```json)
+        ai_response_text = response.text.replace("```json", "").replace("```", "").strip()
+        result_json = json.loads(ai_response_text)
+        
+        final_grade = float(result_json.get("score", 0.0))
+        feedback = {
+            "strengths": result_json.get("strengths", "Code có cấu trúc cơ bản."),
+            "weaknesses": result_json.get("weaknesses", "Chưa thể phân tích sâu hơn.")
+        }
+
+        # 6. Lưu điểm Gemini chấm vào cơ sở dữ liệu
         query_upsert = text("""
             IF EXISTS (SELECT 1 FROM AI_LichSuLamBai WHERE MaSinhVien = :sv_id AND MaBaiTap = :ex_id)
                 UPDATE AI_LichSuLamBai SET DiemSo = :grade WHERE MaSinhVien = :sv_id AND MaBaiTap = :ex_id
             ELSE INSERT INTO AI_LichSuLamBai (MaSinhVien, MaBaiTap, DiemSo) VALUES (:sv_id, :ex_id, :grade)
         """)
         conn.execute(query_upsert, {"sv_id": request.student_id, "ex_id": request.exercise_id, "grade": final_grade})
-        conn.commit(); conn.close()
-        return {"status": "success", "score": final_grade, "passed": True, "feedback": feedback}
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+        conn.commit()
+        
+        return {"status": "success", "score": final_grade, "passed": final_grade >= 5.0, "feedback": feedback}
+        
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Lỗi: AI trả về kết quả không đọc được, hãy nộp lại!")
+    except Exception as e: 
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+# ==============================================================================
 
 class RecommendRequest(BaseModel):
     student_id: int; top_k: int = 6; subject_code: str = ""
@@ -98,7 +164,7 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     
     fixed_avg_score = 0.0; academic_rank = "Chưa có điểm"; course_score_supa = 0.0
     
-    supa_url = os.getenv("SUPABASE_URL", "https://bxpugrlaosbemlfttrnk.supabase.co")
+    supa_url = os.getenv("SUPABASE_URL", "[https://bxpugrlaosbemlfttrnk.supabase.co](https://bxpugrlaosbemlfttrnk.supabase.co)")
     supa_key = os.getenv("SUPABASE_KEY")
     
     if supa_key:
@@ -195,9 +261,6 @@ def login_user(request: LoginRequest):
     if df.empty: return {"status": "error", "message": "Sai thông tin!"}
     return {"status": "success", "role": df.iloc[0]['VaiTro'], "user_id": int(df.iloc[0]['MaNguoiDung']), "full_name": df.iloc[0]['HoTen'], "username": request.username}
 
-# =======================================================
-# 🔐 TÍNH NĂNG MỚI: ĐỔI MẬT KHẨU
-# =======================================================
 class ChangePasswordRequest(BaseModel):
     user_id: int
     old_password: str
@@ -209,18 +272,15 @@ def change_password(request: ChangePasswordRequest, x_user_role: str = Header(No
     
     conn = get_db_connection()
     try:
-        # 1. Kiểm tra mật khẩu cũ
         query_check = text("SELECT MatKhau FROM TAIKHOAN WHERE MaNguoiDung = :uid")
         df = pd.read_sql(query_check, conn, params={"uid": request.user_id})
         
-        if df.empty:
-            return {"status": "error", "message": "Không tìm thấy tài khoản!"}
+        if df.empty: return {"status": "error", "message": "Không tìm thấy tài khoản!"}
             
         current_db_password = str(df.iloc[0]['MatKhau']).strip()
         if current_db_password != request.old_password:
             return {"status": "error", "message": "Mật khẩu cũ không chính xác!"}
             
-        # 2. Cập nhật mật khẩu mới
         query_update = text("UPDATE TAIKHOAN SET MatKhau = :new_pw WHERE MaNguoiDung = :uid")
         conn.execute(query_update, {"new_pw": request.new_password, "uid": request.user_id})
         conn.commit()
@@ -230,7 +290,6 @@ def change_password(request: ChangePasswordRequest, x_user_role: str = Header(No
         return {"status": "error", "message": f"Lỗi hệ thống: {str(e)}"}
     finally:
         conn.close()
-# =======================================================
 
 @app.get("/api/teacher/overview", tags=["Giảng Viên"])
 def get_teacher_overview(x_user_role: str = Header(None)):
