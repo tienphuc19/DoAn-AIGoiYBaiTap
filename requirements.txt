@@ -9,3 +9,4 @@ requests
 python-dotenv
 python-dotenv
 google-generativeai
+
