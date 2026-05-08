@@ -10,7 +10,6 @@ import os
 import requests
 import random
 import json
-import google.generativeai as genai  # <-- THƯ VIỆN GEMINI MỚI THÊM
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -75,59 +74,62 @@ class MockGradeRequest(BaseModel):
     student_id: int; exercise_id: int; submitted_work: str = "" 
 
 # ==============================================================================
-# ĐÂY LÀ PHẦN ĐÃ NÂNG CẤP: TÍCH HỢP GEMINI VÀO CHẤM CODE THỰC TẾ
+# HỆ THỐNG GỌI TRỰC TIẾP REST-API CỦA GEMINI (KHÔNG BỊ LỖI THƯ VIỆN)
 # ==============================================================================
 @app.post("/api/mock-grade-and-submit", tags=["Sinh Viên"])
 def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header(None)):
     if x_user_role != "student": raise HTTPException(status_code=403)
     
-    # Kiểm tra nếu sinh viên nộp code trắng hoặc quá ngắn
     if not request.submitted_work or len(request.submitted_work.strip()) < 5:
         return {"status": "error", "message": "Code quá ngắn hoặc trống, vui lòng viết code đàng hoàng!"}
 
     conn = get_db_connection()
     try:
-        # 1. Kéo đề bài từ SQL Server lên để Gemini biết đường chấm
         df_bt = pd.read_sql(f"SELECT TenBaiTap, MoTa, YeuCau FROM BAITAP WHERE Id = {request.exercise_id}", conn)
-        if df_bt.empty:
-            raise Exception("Không tìm thấy bài tập!")
+        if df_bt.empty: raise Exception("Không tìm thấy bài tập!")
             
         ten_bt = str(df_bt.iloc[0]['TenBaiTap'])
         mota = str(df_bt.iloc[0]['MoTa'])
         yeucau = str(df_bt.iloc[0]['YeuCau'])
 
-        # 2. Cấu hình Gemini bằng API Key của bạn
-        genai.configure(api_key="AIzaSyDhRK9jFo69jzzB_LuVFA26Bg7HvzUb6ic")
-        # Sử dụng model gemini-1.5-flash để tốc độ phản hồi cực nhanh
-        model = genai.GenerativeModel('gemini-1.5-flash')
-
-        # 3. Viết Prompt ép Gemini đóng vai giảng viên chấm bài và trả về JSON
+        gemini_key = "AIzaSyDhRK9jFo69jzzB_LuVFA26Bg7HvzUb6ic"
+        
         prompt = f"""
-        Bạn là một giảng viên chấm thi môn Lập trình cực kỳ nghiêm khắc nhưng công tâm.
-        Hãy chấm điểm đoạn code của sinh viên dựa trên thông tin đề bài sau:
-        - Tên bài: {ten_bt}
-        - Mô tả: {mota}
+        Bạn là giảng viên chấm thi Lập trình nghiêm khắc. Chấm điểm code của sinh viên:
+        - Tên: {ten_bt}
         - Yêu cầu: {yeucau}
-
-        ĐÂY LÀ CODE CỦA SINH VIÊN:
+        
+        CODE SINH VIÊN NỘP:
         ```
         {request.submitted_work}
         ```
-
-        Nhiệm vụ của bạn: Đọc code, xem có đúng logic và yêu cầu không. Chấm trên thang điểm 10.
-        BẠN CHỈ ĐƯỢC PHÉP TRẢ VỀ DUY NHẤT MỘT CHUỖI JSON ĐÚNG ĐỊNH DẠNG DƯỚI ĐÂY, TUYỆT ĐỐI KHÔNG GIẢI THÍCH HAY VIẾT THÊM BẤT KỲ CHỮ NÀO KHÁC:
+        Nhiệm vụ: Chấm trên thang điểm 10. Tìm lỗi sai hoặc khen ngợi.
+        BẠN CHỈ ĐƯỢC PHÉP TRẢ VỀ DUY NHẤT MỘT CHUỖI JSON ĐÚNG ĐỊNH DẠNG DƯỚI ĐÂY, KHÔNG GIẢI THÍCH THÊM:
         {{
-            "score": [Điểm số, ví dụ 8.5],
-            "strengths": "[1 câu ngắn khen ngợi hoặc chỉ ra điểm đúng của code]",
-            "weaknesses": "[1 câu ngắn chỉ ra lỗi sai, lỗi biên dịch, hoặc chỗ cần tối ưu]"
+            "score": 8.5,
+            "strengths": "[1 câu ngắn khen ngợi]",
+            "weaknesses": "[1 câu ngắn chỉ lỗi sai]"
         }}
         """
 
-        # 4. Gửi đề bài & code cho Gemini
-        response = model.generate_content(prompt)
+        # GỌI THẲNG VÀO SERVER GOOGLE BẰNG REQUESTS
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}]
+        }
         
-        # 5. Xử lý chuỗi JSON do Gemini trả về (đề phòng nó bọc trong ```json)
-        ai_response_text = response.text.replace("```json", "").replace("```", "").strip()
+        # Gửi dữ liệu đi
+        ai_res = requests.post(api_url, headers={"Content-Type": "application/json"}, json=payload)
+        
+        # Kiểm tra nếu Google báo lỗi API Key hoặc server
+        if ai_res.status_code != 200:
+            raise Exception(f"Lỗi từ hệ thống Google AI: {ai_res.text}")
+
+        # Lọc lấy câu trả lời JSON của Gemini
+        res_data = ai_res.json()
+        ai_response_text = res_data['candidates'][0]['content']['parts'][0]['text']
+        
+        ai_response_text = ai_response_text.replace("```json", "").replace("```", "").strip()
         result_json = json.loads(ai_response_text)
         
         final_grade = float(result_json.get("score", 0.0))
@@ -136,7 +138,7 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
             "weaknesses": result_json.get("weaknesses", "Chưa thể phân tích sâu hơn.")
         }
 
-        # 6. Lưu điểm Gemini chấm vào cơ sở dữ liệu
+        # Lưu điểm
         query_upsert = text("""
             IF EXISTS (SELECT 1 FROM AI_LichSuLamBai WHERE MaSinhVien = :sv_id AND MaBaiTap = :ex_id)
                 UPDATE AI_LichSuLamBai SET DiemSo = :grade WHERE MaSinhVien = :sv_id AND MaBaiTap = :ex_id
@@ -148,7 +150,7 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
         return {"status": "success", "score": final_grade, "passed": final_grade >= 5.0, "feedback": feedback}
         
     except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Lỗi: AI trả về kết quả không đọc được, hãy nộp lại!")
+        raise HTTPException(status_code=500, detail="AI trả về kết quả bị lỗi chữ, vui lòng nộp lại!")
     except Exception as e: 
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -164,7 +166,7 @@ def get_recommendations_cbf(request: RecommendRequest, x_user_role: str = Header
     
     fixed_avg_score = 0.0; academic_rank = "Chưa có điểm"; course_score_supa = 0.0
     
-    supa_url = os.getenv("SUPABASE_URL", "[https://bxpugrlaosbemlfttrnk.supabase.co](https://bxpugrlaosbemlfttrnk.supabase.co)")
+    supa_url = os.getenv("SUPABASE_URL", "https://bxpugrlaosbemlfttrnk.supabase.co")
     supa_key = os.getenv("SUPABASE_KEY")
     
     if supa_key:
