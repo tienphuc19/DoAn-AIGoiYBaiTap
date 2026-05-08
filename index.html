@@ -14,7 +14,6 @@
         .difficulty-1 { border-left: 4px solid #22c55e; } 
         .difficulty-2 { border-left: 4px solid #eab308; } 
         .difficulty-3 { border-left: 4px solid #ef4444; } 
-        /* Tùy chỉnh thanh cuộn cho bảng danh sách sinh viên */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 10px; }
@@ -23,7 +22,6 @@
 </head>
 <body class="text-gray-800">
 
-    <!-- ==================== MÀN HÌNH ĐĂNG NHẬP ==================== -->
     <div id="login-section" class="min-h-screen flex items-center justify-center bg-gray-100">
         <div class="bg-white p-8 rounded-xl shadow-lg w-96 text-center border-t-4 border-blue-600">
             <div class="text-blue-600 text-5xl mb-4"><i class="fa-solid fa-robot"></i></div>
@@ -35,14 +33,13 @@
         </div>
     </div>
 
-    <!-- ==================== MÀN HÌNH CHÍNH ỨNG DỤNG ==================== -->
     <div id="app-section" class="hidden min-h-screen">
         
         <header class="bg-white shadow-sm sticky top-0 z-40">
             <div class="max-w-7xl mx-auto px-4 h-20 flex justify-between items-center">
                 <div class="flex items-center text-blue-600">
                     <i class="fa-solid fa-robot text-4xl mr-3"></i>
-                    <h1 class="text-2xl font-black tracking-wider">Hẹ Thống Gợi Ý Bài Tập</h1>
+                    <h1 class="text-2xl font-black tracking-wider">AI LEARNING</h1>
                 </div>
                 
                 <div class="flex items-center space-x-6">
@@ -65,7 +62,6 @@
 
         <main class="max-w-7xl mx-auto px-4 py-8">
             
-            <!-- ================= GIAO DIỆN GIẢNG VIÊN ================= -->
             <div id="teacher-view" class="hidden">
                 <div class="flex justify-between items-center mb-8">
                     <h2 class="text-3xl font-bold text-gray-800 flex items-center">
@@ -76,11 +72,9 @@
                     </div>
                 </div>
                 <div id="classes-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- JS render Lớp học -->
-                </div>
+                    </div>
             </div>
 
-            <!-- ================= GIAO DIỆN SINH VIÊN ================= -->
             <div id="student-view" class="hidden">
                 <div class="bg-white rounded-xl shadow-sm mb-8 flex overflow-hidden border border-gray-200">
                     <button onclick="switchTab('CTDLGT')" id="tab-CTDLGT" class="flex-1 py-4 text-center tab-inactive transition-colors">Cấu trúc dữ liệu & Giải thuật</button>
@@ -94,7 +88,7 @@
                     <div id="score-sidebar" class="w-full lg:w-1/3 space-y-6">
                         <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 relative overflow-hidden">
                             <div class="absolute top-0 left-0 w-1 h-full bg-yellow-400"></div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">HỌC LỰC CHUNG (SUPABASE)</p>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">HỌC LỰC </p>
                             <div class="flex items-baseline mb-2">
                                 <span id="hl-score" class="text-6xl font-black text-gray-800">--</span>
                                 <span class="text-gray-400 font-bold ml-1">/10</span>
@@ -130,437 +124,3 @@
                                 <i class="fa-solid fa-clock text-blue-500 mr-3"></i> LỊCH SỬ LÀM BÀI
                             </h3>
                             <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                <table class="w-full text-left">
-                                    <thead class="bg-gray-50 border-b">
-                                        <tr>
-                                            <th class="p-4 font-semibold text-gray-600">Tên bài tập</th>
-                                            <th class="p-4 font-semibold text-gray-600 text-center">Điểm số</th>
-                                            <th class="p-4 font-semibold text-gray-600 text-center">Độ khó</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="history-list" class="divide-y"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <!-- ==================== MODAL LÀM BÀI TẬP (CÓ TÍNH NĂNG UPLOAD FILE) ==================== -->
-    <div id="exerciseModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-            <div class="p-5 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
-                <h2 id="modal-title" class="text-xl font-bold text-blue-800">Tên bài tập</h2>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-red-500 text-2xl font-bold transition-colors">&times;</button>
-            </div>
-            <div class="p-6 overflow-y-auto flex-1">
-                <div class="mb-5">
-                    <h4 class="font-bold text-gray-700 mb-2 flex items-center"><i class="fa-solid fa-book-open text-blue-500 mr-2"></i>Mô tả bài toán:</h4>
-                    <p id="modal-desc" class="text-gray-600 bg-blue-50/50 p-4 rounded-lg text-sm border border-blue-100">Đang tải...</p>
-                </div>
-                <div class="mb-5">
-                    <h4 class="font-bold text-gray-700 mb-2 flex items-center"><i class="fa-solid fa-list-check text-green-500 mr-2"></i>Yêu cầu:</h4>
-                    <p id="modal-req" class="text-gray-600 bg-green-50/50 p-4 rounded-lg text-sm border border-green-100">Đang tải...</p>
-                </div>
-                <div>
-                    <div class="flex justify-between items-end mb-2">
-                        <h4 class="font-bold text-gray-700 flex items-center"><i class="fa-solid fa-code text-gray-500 mr-2"></i>Code của bạn:</h4>
-                        <!-- NÚT UPLOAD FILE -->
-                        <div class="relative overflow-hidden inline-block cursor-pointer">
-                            <button class="bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 font-semibold py-1 px-3 rounded-lg text-sm transition-colors flex items-center cursor-pointer">
-                                <i class="fa-solid fa-upload mr-2 text-blue-500"></i> Nộp bằng File
-                            </button>
-                            <input type="file" id="file-upload" accept=".cpp,.py,.txt,.c,.java" onchange="handleFileUpload(event)" class="absolute left-0 top-0 opacity-0 cursor-pointer w-full h-full">
-                        </div>
-                    </div>
-                    <textarea id="modal-code" rows="8" class="w-full border rounded-lg p-4 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50" placeholder="// Viết code hoặc tải file code của bạn lên đây..."></textarea>
-                </div>
-                <div id="modal-feedback" class="mt-4 hidden p-4 rounded-lg text-sm"></div>
-            </div>
-            <div class="p-5 border-t bg-gray-50 rounded-b-2xl flex justify-end gap-3">
-                <button onclick="closeModal()" class="px-6 py-2 rounded-lg font-semibold text-gray-600 bg-white border shadow-sm hover:bg-gray-100 transition-colors">Hủy bỏ</button>
-                <button onclick="submitMockWork()" id="btn-submit" class="px-6 py-2 rounded-lg font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-colors flex items-center">
-                    <i class="fa-solid fa-paper-plane mr-2"></i> Nộp Bài Cho AI
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ==================== MODAL XEM ĐIỂM SINH VIÊN (DÀNH CHO GIẢNG VIÊN) ==================== -->
-    <div id="teacherStudentModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
-            <div class="p-5 border-b bg-blue-50 flex justify-between items-center rounded-t-2xl">
-                <div>
-                    <h3 class="text-lg font-bold text-blue-800 m-0"><i class="fa-solid fa-user-graduate mr-2"></i>Lịch sử làm bài</h3>
-                    <p id="ts-modal-name" class="text-sm text-blue-600 font-semibold mt-1">Đang tải...</p>
-                </div>
-                <button onclick="closeTeacherStudentModal()" class="text-gray-400 hover:text-red-500 text-2xl font-bold transition-colors">&times;</button>
-            </div>
-            <div class="p-0 overflow-y-auto flex-1">
-                <table class="w-full text-left">
-                    <thead class="bg-gray-50 sticky top-0 border-b">
-                        <tr>
-                            <th class="p-4 font-semibold text-gray-600">Tên bài tập</th>
-                            <th class="p-4 font-semibold text-gray-600 text-center">Điểm AI chấm</th>
-                            <th class="p-4 font-semibold text-gray-600 text-center">Độ khó</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ts-history-list" class="divide-y">
-                        <!-- JS render -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- ==================== MODAL ĐỔI MẬT KHẨU ==================== -->
-    <div id="changePwModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
-            <div class="p-5 border-b bg-blue-50 flex items-center">
-                <i class="fa-solid fa-user-lock text-blue-600 text-xl mr-3"></i>
-                <h3 class="text-lg font-bold text-blue-800 m-0">Đổi Mật Khẩu</h3>
-            </div>
-            <div class="p-6">
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1">Mật khẩu cũ:</label>
-                        <input type="password" id="oldPwInput" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1">Mật khẩu mới:</label>
-                        <input type="password" id="newPwInput" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1">Xác nhận mật khẩu mới:</label>
-                        <input type="password" id="confirmPwInput" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                </div>
-                <p id="pwMessage" class="mt-4 text-sm font-semibold h-5 text-center"></p>
-            </div>
-            <div class="p-4 border-t bg-gray-50 flex justify-end gap-3">
-                <button onclick="closeChangePwModal()" class="px-4 py-2 rounded-lg font-semibold text-gray-600 hover:bg-gray-200 border bg-white transition-colors">Hủy</button>
-                <button onclick="submitChangePw()" class="px-4 py-2 rounded-lg font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-colors">Xác nhận</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ==================== SCRIPT XỬ LÝ ==================== -->
-    <script>
-        const API_BASE = window.location.origin; 
-        let currentSubject = 'NMLT';
-        let currentExerciseId = null;
-
-        function checkAuth() {
-            const userId = localStorage.getItem('user_id');
-            const userRole = localStorage.getItem('user_role');
-            if (userId && userRole) {
-                document.getElementById('login-section').classList.add('hidden');
-                document.getElementById('app-section').classList.remove('hidden');
-                document.getElementById('user-fullname').innerText = localStorage.getItem('full_name');
-                document.getElementById('user-role-text').innerText = userRole === 'student' ? 'STUDENT' : 'TEACHER';
-                
-                if (userRole === 'student') {
-                    document.getElementById('student-view').classList.remove('hidden');
-                    document.getElementById('teacher-view').classList.add('hidden');
-                    switchTab(currentSubject); 
-                } else {
-                    document.getElementById('student-view').classList.add('hidden');
-                    document.getElementById('teacher-view').classList.remove('hidden');
-                    loadTeacherDashboard();
-                }
-            } else {
-                document.getElementById('login-section').classList.remove('hidden');
-                document.getElementById('app-section').classList.add('hidden');
-            }
-        }
-
-        async function login() {
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            const err = document.getElementById('login-error');
-            
-            try {
-                err.classList.add('hidden');
-                const res = await fetch(`${API_BASE}/api/login`, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username: u, password: p})
-                });
-                const data = await res.json();
-                
-                if (data.status === 'success') {
-                    localStorage.setItem('user_id', data.user_id);
-                    localStorage.setItem('user_role', data.role);
-                    localStorage.setItem('full_name', data.full_name);
-                    localStorage.setItem('username', data.username);
-                    checkAuth();
-                } else {
-                    err.innerText = data.message; err.classList.remove('hidden');
-                }
-            } catch (e) {
-                err.innerText = "Lỗi kết nối máy chủ!"; err.classList.remove('hidden');
-            }
-        }
-
-        function logout() {
-            localStorage.clear(); checkAuth();
-            document.getElementById('username').value = ''; document.getElementById('password').value = '';
-        }
-
-        // --- ĐỔI MẬT KHẨU ---
-        function openChangePwModal() {
-            document.getElementById('changePwModal').classList.remove('hidden');
-            document.getElementById('oldPwInput').value = ''; document.getElementById('newPwInput').value = '';
-            document.getElementById('confirmPwInput').value = ''; document.getElementById('pwMessage').innerText = '';
-        }
-        function closeChangePwModal() { document.getElementById('changePwModal').classList.add('hidden'); }
-
-        async function submitChangePw() {
-            const oldPw = document.getElementById('oldPwInput').value;
-            const newPw = document.getElementById('newPwInput').value;
-            const confirmPw = document.getElementById('confirmPwInput').value;
-            const msgEl = document.getElementById('pwMessage');
-
-            if (!oldPw || !newPw || !confirmPw) { msgEl.innerText = "Vui lòng nhập đủ thông tin!"; msgEl.className = "mt-4 text-sm font-semibold h-5 text-center text-red-500"; return; }
-            if (newPw !== confirmPw) { msgEl.innerText = "Mật khẩu không khớp!"; msgEl.className = "mt-4 text-sm font-semibold h-5 text-center text-red-500"; return; }
-
-            try {
-                const res = await fetch(`${API_BASE}/api/change-password`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-user-role': localStorage.getItem('user_role') },
-                    body: JSON.stringify({ user_id: parseInt(localStorage.getItem('user_id')), old_password: oldPw, new_password: newPw })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    msgEl.innerText = data.message; msgEl.className = "mt-4 text-sm font-semibold h-5 text-center text-green-600";
-                    setTimeout(() => { closeChangePwModal(); alert("Đổi mật khẩu thành công! Hãy đăng nhập lại."); logout(); }, 1500);
-                } else {
-                    msgEl.innerText = data.message; msgEl.className = "mt-4 text-sm font-semibold h-5 text-center text-red-500";
-                }
-            } catch (e) { msgEl.innerText = "Lỗi máy chủ!"; msgEl.className = "mt-4 text-sm font-semibold h-5 text-center text-red-500"; }
-        }
-
-        // --- GIẢNG VIÊN ---
-        async function loadTeacherDashboard() {
-            const container = document.getElementById('classes-grid');
-            container.innerHTML = '<p class="col-span-3 text-center text-gray-500">Đang tải dữ liệu lớp học...</p>';
-            try {
-                const res = await fetch(`${API_BASE}/api/teacher/overview`, { headers: {'x-user-role': 'teacher'} });
-                const data = await res.json();
-                if(data.status === 'success'){
-                    document.getElementById('weak-students-count').innerText = data.weak_students_count;
-                    container.innerHTML = '';
-                    data.classes.forEach(cls => {
-                        let studentsHtml = '';
-                        cls.students.forEach(sv => {
-                            let icon = sv.failed_count > 0 ? '<i class="fa-solid fa-circle-xmark text-red-500 text-xl"></i>' : '<i class="fa-solid fa-circle-check text-green-500 text-xl"></i>';
-                            // Đã thêm sự kiện Click để xem chi tiết sinh viên
-                            studentsHtml += `
-                                <div onclick="openTeacherStudentModal(${sv.user_id}, '${sv.fullname}')" class="flex justify-between items-center p-4 hover:bg-blue-50 border-b last:border-0 transition-colors cursor-pointer group">
-                                    <div>
-                                        <p class="font-bold text-gray-700 text-sm group-hover:text-blue-700">${sv.fullname}</p>
-                                        <p class="text-xs text-gray-400 font-mono mt-1">Mã: ${sv.username}</p>
-                                    </div>
-                                    ${icon}
-                                </div>
-                            `;
-                        });
-                        container.innerHTML += `
-                            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                <div class="bg-blue-50 border-b px-5 py-3">
-                                    <h3 class="font-black text-blue-800 tracking-wide">Lớp: ${cls.class_name}</h3>
-                                </div>
-                                <div class="p-0 h-96 overflow-y-auto">
-                                    ${studentsHtml}
-                                </div>
-                            </div>
-                        `;
-                    });
-                }
-            } catch(e) {}
-        }
-
-        // Popup xem điểm của Giảng viên
-        async function openTeacherStudentModal(svId, svName) {
-            document.getElementById('ts-modal-name').innerText = svName + ' (Mã: ' + svId + ')';
-            document.getElementById('teacherStudentModal').classList.remove('hidden');
-            const tbody = document.getElementById('ts-history-list');
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center p-8 text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Đang tải dữ liệu...</td></tr>';
-            
-            try {
-                const res = await fetch(`${API_BASE}/api/history/${svId}`, { headers: {'x-user-role': 'teacher'} });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    if (data.history.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="3" class="text-center p-8 text-gray-400">Sinh viên này chưa nộp bài tập nào cho AI.</td></tr>';
-                    } else {
-                        tbody.innerHTML = '';
-                        data.history.forEach(item => {
-                            let diffText = item.Difficulty == 1 ? "Dễ" : (item.Difficulty == 2 ? "Trung Bình" : "Khó");
-                            let scoreColor = item.Score >= 8 ? 'text-green-600' : (item.Score >= 5 ? 'text-yellow-600' : 'text-red-600');
-                            tbody.innerHTML += `
-                                <tr class="hover:bg-blue-50 transition-colors">
-                                    <td class="p-4 font-medium text-gray-700">${item.Title}</td>
-                                    <td class="p-4 text-center font-bold text-lg ${scoreColor}">${item.Score.toFixed(1)}</td>
-                                    <td class="p-4 text-center text-sm text-gray-500 border-l">${diffText}</td>
-                                </tr>
-                            `;
-                        });
-                    }
-                }
-            } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-red-500">Lỗi lấy dữ liệu!</td></tr>';
-            }
-        }
-        function closeTeacherStudentModal() { document.getElementById('teacherStudentModal').classList.add('hidden'); }
-
-        // --- SINH VIÊN ---
-        function switchTab(tabName) {
-            currentSubject = tabName;
-            ['CTDLGT', 'KTLT', 'OOP', 'NMLT', 'HISTORY'].forEach(t => {
-                const el = document.getElementById(`tab-${t}`);
-                if(el) el.className = t === 'HISTORY' ? "px-6 py-4 text-center tab-inactive bg-gray-50 border-l hover:bg-gray-100 transition-colors" : "flex-1 py-4 text-center tab-inactive transition-colors bg-white";
-            });
-
-            const activeEl = document.getElementById(`tab-${tabName}`);
-            if(activeEl) {
-                if (tabName === 'HISTORY') activeEl.className = "px-6 py-4 text-center font-bold bg-blue-50 text-blue-600 border-l border-b-2 border-blue-600 transition-colors";
-                else activeEl.className = "flex-1 py-4 text-center bg-blue-50 text-blue-600 font-bold border-b-2 border-blue-600 transition-colors";
-            }
-
-            if (tabName === 'HISTORY') {
-                document.getElementById('score-sidebar').classList.add('hidden'); document.getElementById('recommendation-container').classList.add('hidden'); document.getElementById('history-container').classList.remove('hidden');
-                loadHistory();
-            } else {
-                document.getElementById('score-sidebar').classList.remove('hidden'); document.getElementById('recommendation-container').classList.remove('hidden'); document.getElementById('history-container').classList.add('hidden');
-                loadStudentDashboard();
-            }
-        }
-
-        async function loadStudentDashboard() {
-            const listEl = document.getElementById('exercise-list');
-            listEl.innerHTML = '<div class="text-center p-8 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p>AI đang phân tích lộ trình...</p></div>';
-            document.getElementById('hl-score').innerText = '--'; document.getElementById('ai-score').innerText = '--'; document.getElementById('hl-rank').innerText = 'Đang tải...';
-
-            try {
-                const res = await fetch(`${API_BASE}/api/recommend`, {
-                    method: 'POST', headers: {'Content-Type': 'application/json', 'x-user-role': 'student'},
-                    body: JSON.stringify({ student_id: parseInt(localStorage.getItem('user_id')), subject_code: currentSubject, top_k: 6 })
-                });
-                const data = await res.json();
-                
-                if (data.status === 'success') {
-                    document.getElementById('hl-score').innerText = data.avg_score.toFixed(1);
-                    document.getElementById('hl-rank').innerText = data.academic_rank || 'Chưa rõ';
-                    document.getElementById('ai-score').innerText = data.subject_score.toFixed(1);
-
-                    listEl.innerHTML = '';
-                    if (data.recommendations.length === 0) { listEl.innerHTML = '<div class="bg-green-50 text-green-600 p-6 rounded-xl border border-green-200 text-center font-bold shadow-sm">Bạn đã hoàn thành xuất sắc tất cả bài tập môn này! 🎉</div>'; return; }
-
-                    data.recommendations.forEach(ex => {
-                        let diffText = ex.Difficulty == 1 ? "DỄ" : (ex.Difficulty == 2 ? "TRUNG BÌNH" : "KHÓ");
-                        listEl.innerHTML += `
-                            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex justify-between items-center transition-transform hover:-translate-y-1 hover:shadow-md difficulty-${ex.Difficulty}">
-                                <div>
-                                    <h4 class="font-bold text-gray-800 text-lg mb-2">${ex.Title}</h4>
-                                    <span class="text-xs font-bold text-gray-500 bg-gray-100 border px-2 py-1 rounded">ĐỘ KHÓ: ${diffText}</span>
-                                </div>
-                                <button onclick="openExercise(${ex.ExerciseID}, '${ex.Title.replace(/'/g, "\\'")}')" class="bg-white border-2 border-blue-100 text-blue-600 font-bold px-6 py-2 rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm">
-                                    LUYỆN TẬP
-                                </button>
-                            </div>
-                        `;
-                    });
-                }
-            } catch(e) { listEl.innerHTML = '<p class="text-red-500">Lỗi máy chủ AI.</p>'; }
-        }
-
-        async function loadHistory() {
-            const tbody = document.getElementById('history-list');
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center p-8 text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Đang tải lịch sử...</td></tr>';
-            try {
-                const res = await fetch(`${API_BASE}/api/history/${localStorage.getItem('user_id')}`, { headers: {'x-user-role': 'student'} });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    if(data.history.length === 0) { tbody.innerHTML = '<tr><td colspan="3" class="text-center p-8 text-gray-400">Bạn chưa nộp bài nào trên hệ thống.</td></tr>'; return; }
-                    tbody.innerHTML = '';
-                    data.history.forEach(item => {
-                        let diffText = item.Difficulty == 1 ? "Dễ" : (item.Difficulty == 2 ? "Trung Bình" : "Khó");
-                        let scoreColor = item.Score >= 8 ? 'text-green-600' : (item.Score >= 5 ? 'text-yellow-600' : 'text-red-600');
-                        tbody.innerHTML += `
-                            <tr class="hover:bg-blue-50 transition-colors">
-                                <td class="p-4 border-b font-medium text-gray-700">${item.Title}</td>
-                                <td class="p-4 border-b text-center font-bold ${scoreColor} text-lg">${item.Score.toFixed(1)}</td>
-                                <td class="p-4 border-b text-center text-sm text-gray-500 border-l">${diffText}</td>
-                            </tr>
-                        `;
-                    });
-                }
-            } catch (e) { tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-red-500">Lỗi tải lịch sử.</td></tr>'; }
-        }
-
-        // --- NỘP BÀI AI ---
-        async function openExercise(id, title) {
-            currentExerciseId = id;
-            document.getElementById('modal-title').innerText = title;
-            document.getElementById('modal-desc').innerText = "Đang tải..."; document.getElementById('modal-req').innerText = "Đang tải...";
-            document.getElementById('modal-code').value = "";
-            document.getElementById('file-upload').value = ""; // reset file input
-            document.getElementById('modal-feedback').classList.add('hidden');
-            document.getElementById('btn-submit').classList.remove('hidden');
-            document.getElementById('exerciseModal').classList.remove('hidden');
-
-            try {
-                const res = await fetch(`${API_BASE}/api/exercise-details/${id}`);
-                const data = await res.json();
-                if(data.status === 'success') {
-                    document.getElementById('modal-desc').innerText = data.mota;
-                    document.getElementById('modal-req').innerText = data.yeucau;
-                }
-            } catch(e) {}
-        }
-        function closeModal() { document.getElementById('exerciseModal').classList.add('hidden'); }
-
-        // Tính năng mới: Đọc nội dung file upload
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                document.getElementById('modal-code').value = e.target.result;
-            };
-            reader.readAsText(file);
-        }
-
-        async function submitMockWork() {
-            const btn = document.getElementById('btn-submit');
-            const feedbackBox = document.getElementById('modal-feedback');
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> AI đang chấm...'; btn.disabled = true;
-
-            try {
-                const res = await fetch(`${API_BASE}/api/mock-grade-and-submit`, {
-                    method: 'POST', headers: {'Content-Type': 'application/json', 'x-user-role': 'student'},
-                    body: JSON.stringify({ student_id: parseInt(localStorage.getItem('user_id')), exercise_id: currentExerciseId, submitted_work: document.getElementById('modal-code').value })
-                });
-                const data = await res.json();
-                
-                feedbackBox.classList.remove('hidden');
-                if (data.status === 'success') {
-                    feedbackBox.className = `mt-4 p-5 rounded-xl border-2 ${data.score >= 5 ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'} shadow-inner`;
-                    feedbackBox.innerHTML = `
-                        <p class="font-black text-2xl mb-3 border-b pb-2 ${data.score >= 5 ? 'border-green-200' : 'border-red-200'}">ĐIỂM: ${data.score} / 10</p>
-                        <p class="mb-1"><i class="fa-solid fa-check-circle mr-2"></i> <b>Điểm mạnh:</b> ${data.feedback.strengths}</p>
-                        <p><i class="fa-solid fa-exclamation-circle mr-2"></i> <b>Cần cải thiện:</b> ${data.feedback.weaknesses}</p>
-                    `;
-                    btn.classList.add('hidden');
-                    loadStudentDashboard(); 
-                }
-            } catch(e) { alert("Lỗi khi nộp bài!"); } 
-            finally { btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Nộp Bài Cho AI'; btn.disabled = false; }
-        }
-
-        checkAuth();
-    </script>
-</body>
-</html>
