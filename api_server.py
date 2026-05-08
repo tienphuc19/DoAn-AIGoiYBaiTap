@@ -99,7 +99,7 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
         # 2. Cấu hình Gemini bằng API Key của bạn
         genai.configure(api_key="AIzaSyDhRK9jFo69jzzB_LuVFA26Bg7HvzUb6ic")
         # Sử dụng model gemini-1.5-flash để tốc độ phản hồi cực nhanh
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
         # 3. Viết Prompt ép Gemini đóng vai giảng viên chấm bài và trả về JSON
         prompt = f"""
