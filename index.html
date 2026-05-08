@@ -530,7 +530,7 @@
             reader.readAsText(file);
         }
 
-        async function submitMockWork() {
+       async function submitMockWork() {
             const btn = document.getElementById('btn-submit');
             const feedbackBox = document.getElementById('modal-feedback');
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> AI đang chấm...'; btn.disabled = true;
@@ -543,6 +543,8 @@
                 const data = await res.json();
                 
                 feedbackBox.classList.remove('hidden');
+                
+                // TRƯỜNG HỢP 1: CHẤM THÀNH CÔNG
                 if (data.status === 'success') {
                     feedbackBox.className = `mt-4 p-5 rounded-xl border-2 ${data.score >= 5 ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'} shadow-inner`;
                     feedbackBox.innerHTML = `
@@ -552,12 +554,26 @@
                     `;
                     btn.classList.add('hidden');
                     loadStudentDashboard(); 
+                } 
+                // TRƯỜNG HỢP 2: LỖI LOGIC BÌNH THƯỜNG (Ví dụ code ngắn)
+                else if (data.status === 'error') {
+                    feedbackBox.className = "mt-4 p-4 rounded-lg text-sm border bg-red-50 border-red-200 text-red-800";
+                    feedbackBox.innerHTML = `<b>⚠️ Báo cáo từ AI:</b> ${data.message}`;
                 }
-            } catch(e) { alert("Lỗi khi nộp bài!"); } 
-            finally { btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Nộp Bài Cho AI'; btn.disabled = false; }
-        }
-
-        checkAuth();
+                // TRƯỜNG HỢP 3: LỖI TỪ MÁY CHỦ HOẶC LỖI API KEY GEMINI (FastAPI trả về data.detail)
+                else if (data.detail) {
+                    feedbackBox.className = "mt-4 p-4 rounded-lg text-sm border bg-red-50 border-red-200 text-red-800 font-mono";
+                    feedbackBox.innerHTML = `<b>🚨 Lỗi Hệ Thống AI:</b> ${data.detail}`;
+                }
+            } catch(e) { 
+                feedbackBox.classList.remove('hidden');
+                feedbackBox.className = "mt-4 p-4 rounded-lg text-sm border bg-red-50 border-red-200 text-red-800";
+                feedbackBox.innerHTML = `<b>🔌 Lỗi kết nối:</b> Không thể gọi API chấm bài!`;
+            } 
+            finally { 
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Nộp Bài Cho AI'; btn.disabled = false; 
+            }
+        } checkAuth();
     </script>
 </body>
 </html>
