@@ -113,7 +113,7 @@ def grade_and_submit_result(request: MockGradeRequest, x_user_role: str = Header
         """
 
         # ĐÃ SỬA: Thay tên thành gemini-2.0-flash lấy từ danh sách của bạn
-        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={gemini_key}"
         payload = {
             "contents": [{"parts": [{"text": prompt}]}]
         }
